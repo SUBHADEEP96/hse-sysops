@@ -6,7 +6,13 @@ export default function AppLayout() {
   if (!ready) return <LoadingState />;
   if (!user) return <Redirect href="/(auth)/login" />;
   return (
-    <Stack>
+    <Stack
+      screenOptions={{
+        headerBackTitle: "Back",
+        headerTintColor: "#172033",
+        headerShadowVisible: false,
+      }}
+    >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="audits/create" options={{ title: "Create audit" }} />
       <Stack.Screen

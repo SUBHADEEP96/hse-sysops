@@ -23,12 +23,58 @@ export type AuditPayload = {
   sat_auditees?: (string | number)[];
   form_ids?: (string | number)[];
 };
+export type Country = { id: string; name: string };
+export type Location = { id: string; name: string };
+
+type LookupDto = Record<string, unknown>;
+const isRecord = (value: unknown): value is LookupDto =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+function lookupRows(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (!isRecord(value)) return [];
+  for (const key of ["rows", "countries", "locations"]) {
+    if (Array.isArray(value[key])) return value[key];
+  }
+  return [];
+}
+
+function normalizeLookup(
+  value: unknown,
+  idKey: "country_id" | "location_id",
+  nameKey: "country_name" | "location_name",
+): { id: string; name: string }[] {
+  const unique = new Map<string, { id: string; name: string }>();
+  for (const row of lookupRows(value)) {
+    if (!isRecord(row)) continue;
+    const rawId = row[idKey] ?? row.id;
+    const rawName = row[nameKey] ?? row.name;
+    if (
+      (typeof rawId !== "string" && typeof rawId !== "number") ||
+      (typeof rawName !== "string" && typeof rawName !== "number")
+    )
+      continue;
+    const id = String(rawId).trim();
+    const name = String(rawName).trim();
+    if (!id || !name || unique.has(id)) continue;
+    unique.set(id, { id, name });
+  }
+  return [...unique.values()];
+}
+
+export const normalizeCountries = (value: unknown): Country[] =>
+  normalizeLookup(value, "country_id", "country_name");
+export const normalizeLocations = (value: unknown): Location[] =>
+  normalizeLookup(value, "location_id", "location_name");
 const list = <T>(value: T[] | { rows?: T[]; audits?: T[] }) =>
   Array.isArray(value) ? value : (value.rows ?? value.audits ?? []);
 
 export const auditKeys = {
   all: ["audits"] as const,
   detail: (id: string) => ["audits", id] as const,
+  countries: ["audit-lookups", "countries"] as const,
+  locations: (countryId: string | null) =>
+    ["audit-lookups", "locations", countryId] as const,
 };
 export async function getAudits(
   scope: "my_audits" | "my_location" = "my_audits",
@@ -66,13 +112,9 @@ export const getForms = () =>
     "sat",
     routes.forms,
   );
-export const getCountries = () =>
-  request<{ id: string | number; name?: string; country_name?: string }[]>(
-    "sat",
-    routes.countries,
-  );
-export const getLocations = () =>
-  request<{ id: string | number; name?: string; location_name?: string }[]>(
-    "sat",
-    routes.locations,
+export const getCountries = async () =>
+  normalizeCountries(await request<unknown>("sat", routes.countries));
+export const getLocations = async (countryId: string) =>
+  normalizeLocations(
+    await request<unknown>("sat", routes.locationsForCountry(countryId)),
   );

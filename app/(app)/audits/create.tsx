@@ -1,7 +1,9 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text } from "react-native";
+import { useForm } from "react-hook-form";
+import { queryClient } from "@/src/api/query-client";
 import { Button, ErrorState, Screen, TextField } from "@/src/components/ui";
 import {
   auditKeys,
@@ -9,45 +11,57 @@ import {
   getCountries,
   getLocations,
 } from "@/src/features/audits/api";
+import { LookupSelector } from "@/src/features/audits/LookupSelector";
 import { useAuth } from "@/src/features/auth/session";
-import { queryClient } from "@/src/api/query-client";
-import { useForm } from "react-hook-form";
+
 export default function CreateAudit() {
   const { user } = useAuth();
   const fields = useForm<{ name: string; workArea: string }>({
     defaultValues: { name: "", workArea: "" },
   });
-  const name = fields.watch("name"),
-    workArea = fields.watch("workArea");
-  const [country, setCountry] = useState<string | number>("");
-  const [location, setLocation] = useState<string | number>("");
-  const lookups = useQuery({
-    queryKey: ["audit-lookups"],
-    queryFn: async () => ({
-      countries: await getCountries(),
-      locations: await getLocations(),
-    }),
+  const name = fields.watch("name");
+  const workArea = fields.watch("workArea");
+  const [selectedCountryId, setSelectedCountryId] = useState<string | null>(
+    null,
+  );
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
+    null,
+  );
+  const countries = useQuery({
+    queryKey: auditKeys.countries,
+    queryFn: getCountries,
+  });
+  const locations = useQuery({
+    queryKey: auditKeys.locations(selectedCountryId),
+    queryFn: () =>
+      selectedCountryId ? getLocations(selectedCountryId) : Promise.resolve([]),
+    enabled: selectedCountryId !== null,
   });
   const mutation = useMutation({
     mutationFn: createAudit,
-    onSuccess: async (a) => {
+    onSuccess: async (audit) => {
       await queryClient.invalidateQueries({ queryKey: auditKeys.all });
       router.replace({
         pathname: "/(app)/audits/[auditId]",
-        params: { auditId: String(a.id) },
+        params: { auditId: String(audit.id) },
       });
     },
   });
-  if (lookups.error)
+
+  if (countries.error)
     return (
       <Screen>
         <ErrorState
-          message={lookups.error.message}
-          retry={() => void lookups.refetch()}
+          message={countries.error.message}
+          retry={() => void countries.refetch()}
         />
       </Screen>
     );
-  const valid = name.trim() && country !== "" && location !== "";
+
+  const valid =
+    Boolean(name.trim()) &&
+    selectedCountryId !== null &&
+    selectedLocationId !== null;
   return (
     <Screen>
       <TextField
@@ -55,51 +69,61 @@ export default function CreateAudit() {
         value={name}
         onChangeText={(value) => fields.setValue("name", value)}
       />
-      <Text className="mb-2 font-semibold text-ink">Country *</Text>
-      <View className="mb-4 flex-row flex-wrap gap-2">
-        {lookups.data?.countries.map((x) => (
-          <Pressable
-            key={String(x.id)}
-            onPress={() => setCountry(x.id)}
-            className={`min-h-11 justify-center rounded-xl border px-3 ${country === x.id ? "border-brand bg-red-50" : "border-slate-300 bg-white"}`}
-          >
-            <Text>{x.country_name ?? x.name ?? String(x.id)}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Text className="mb-2 font-semibold text-ink">Location *</Text>
-      <View className="mb-4 flex-row flex-wrap gap-2">
-        {lookups.data?.locations.map((x) => (
-          <Pressable
-            key={String(x.id)}
-            onPress={() => setLocation(x.id)}
-            className={`min-h-11 justify-center rounded-xl border px-3 ${location === x.id ? "border-brand bg-red-50" : "border-slate-300 bg-white"}`}
-          >
-            <Text>{x.location_name ?? x.name ?? String(x.id)}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <LookupSelector
+        label="Country *"
+        options={countries.data ?? []}
+        selectedId={selectedCountryId}
+        loading={countries.isLoading}
+        disabled={countries.isLoading}
+        placeholder="Select a country"
+        onSelect={(id) => {
+          if (id === selectedCountryId) return;
+          setSelectedLocationId(null);
+          setSelectedCountryId(id);
+        }}
+      />
+      <LookupSelector
+        label="Location *"
+        options={locations.data ?? []}
+        selectedId={selectedLocationId}
+        loading={locations.isLoading}
+        disabled={selectedCountryId === null || locations.isLoading}
+        placeholder={
+          selectedCountryId === null
+            ? "Select a country first"
+            : "Select a location"
+        }
+        onSelect={setSelectedLocationId}
+      />
+      {locations.error ? (
+        <ErrorState
+          message={locations.error.message}
+          retry={() => void locations.refetch()}
+        />
+      ) : null}
       <TextField
         label="Work area"
         value={workArea}
         onChangeText={(value) => fields.setValue("workArea", value)}
       />
       {mutation.error ? (
-        <Text className="mb-3 text-red-700">{mutation.error.message}</Text>
+        <Text accessibilityRole="alert" className="mb-3 text-red-700">
+          {mutation.error.message}
+        </Text>
       ) : null}
       <Button
         title={mutation.isPending ? "Creating…" : "Create audit"}
         disabled={!valid || mutation.isPending}
-        onPress={() =>
-          user &&
+        onPress={() => {
+          if (!user || !selectedCountryId || !selectedLocationId) return;
           mutation.mutate({
             auditor_id: user.id,
             audit_name: name.trim(),
-            country,
-            location,
-            ...(workArea ? { work_area: workArea } : {}),
-          })
-        }
+            country: selectedCountryId,
+            location: selectedLocationId,
+            ...(workArea.trim() ? { work_area: workArea.trim() } : {}),
+          });
+        }}
       />
     </Screen>
   );
