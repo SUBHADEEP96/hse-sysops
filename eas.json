@@ -1,0 +1,8 @@
+{
+  "cli": { "version": ">= 16.0.0", "appVersionSource": "remote" },
+  "build": {
+    "development": { "developmentClient": true, "distribution": "internal", "ios": { "simulator": true } },
+    "preview": { "distribution": "internal" },
+    "production": { "autoIncrement": true, "env": { "EXPO_PUBLIC_API_ORIGIN": "https://api-hse-dummy.eframeehs.in", "EXPO_PUBLIC_MASTER_API_PREFIX": "/api/master", "EXPO_PUBLIC_SAT_API_PREFIX": "/api/sat" } }
+  }
+}

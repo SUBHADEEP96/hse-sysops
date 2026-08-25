@@ -1,15 +1,22 @@
 {
   "expo": {
-    "name": "hse-sysops",
-    "slug": "hse-sysops",
+    "name": "HSE Safety Audit Tool",
+    "slug": "hse-sat-ios",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "hsesysops",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.eframeehs.hsesat",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow HSE SAT to photograph observation evidence.",
+        "NSPhotoLibraryUsageDescription": "Allow HSE SAT to select observation evidence from your library."
+      },
+      "config": { "usesNonExemptEncryption": false }
     },
     "android": {
       "adaptiveIcon": {
@@ -27,6 +34,8 @@
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
+      ["expo-image-picker", { "photosPermission": "Allow HSE SAT to select observation evidence.", "cameraPermission": "Allow HSE SAT to photograph observation evidence." }],
       [
         "expo-splash-screen",
         {
@@ -42,7 +51,7 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "extra": {
       "router": {},

@@ -1,50 +1,70 @@
-# Welcome to your Expo app 👋
+# HSE Safety Audit Tool — iOS MVP
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo SDK 54 / React Native 0.81 iOS client for the existing Master and SAT APIs. The app implements secure three-stage authentication, dashboard, audits, server-driven observations, in-app notifications, and a read-only profile.
 
-## Get started
+## Prerequisites and installation
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+- Node.js 20 LTS (the committed Expo toolchain is tested with Node 20)
+- npm 10+
+- Xcode 16+ and an iOS simulator for local iOS development
 
 ```bash
-npm run reset-project
+npm ci
+cp .env.example .env.local
+npx expo start                 # Expo Go; press i for iOS Simulator
+npm run ios                    # iOS simulator
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Only public routing configuration belongs in `.env.local`. `EXPO_PUBLIC_API_ORIGIN` is the unified origin; the Master and SAT prefixes default to `/api/master` and `/api/sat`. Never add credentials or tokens to environment files.
 
-## Learn more
+## Architecture
 
-To learn more about developing your project with Expo, look at the following resources:
+- `app/`: thin Expo Router authentication, tabs, and audit stack routes.
+- `src/api/`: typed HTTP/error handling, route constants, query client, timeout/cancellation, bearer injection, and authenticated-401 invalidation.
+- `src/features/`: feature-first auth, dashboard, audits, observations, notifications, and profile logic.
+- `src/components/ui/`: accessible reusable NativeWind primitives and async states.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+React Query owns server state. The auth context restores and deletes only the SAT session token with SecureStore; passwords, Master tokens, and launch tokens remain transient. Mutations are not retried. SAT 401 responses clear secure user state and cached queries. Dynamic forms are rendered from server questions with required validation and a safe text fallback.
 
-## Join the community
+## Integrated API endpoints
 
-Join our community of developers creating universal apps.
+Authentication uses `POST /api/master/auth/login`, `POST /api/master/auth/app-launch`, then `POST /api/sat/auth/session`. Features use dashboard stats, critical-RPN and observation counts; audit list/detail/create/status/forms/pairs; submission list/create; dynamic forms; countries/locations; RPN likelihood/severity; and all four SAT notification endpoints. The authenticated user ID is always used as auditor/submitter.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Verification
+
+```bash
+npx expo install --fix
+npx expo-doctor
+npm run typecheck
+npm run lint
+npm test
+npm run export:ios
+```
+
+The Jest suite mocks network boundaries and must never contact the production API.
+
+## iOS / TestFlight handover
+
+`app.json` contains the existing EAS project link/owner, iOS bundle identifier, build number, encryption declaration, and camera/photo permission descriptions. `eas.json` provides simulator development, internal preview, and auto-incrementing production profiles. Confirm the bundle identifier with the product owner before the first signed build.
+
+```bash
+npx expo-doctor
+npx eas-cli@latest build:configure
+npx eas-cli@latest build --platform ios --profile production
+npx testflight
+```
+
+The final two commands are owner-controlled: do not run them until Apple credentials and build authorization are available. Production API values are public routing metadata, not secrets.
+
+## Known backend contract limitation
+
+The supplied material describes binary media retrieval but does **not** define observation attachment request keys, MIME/size rules, or submission encoding. Picker, preview, cancellation, removal, and conservative JPEG/PNG/PDF validation are implemented, but submission is deliberately blocked when files are attached. `ObservationAttachmentAdapter` isolates this missing contract; it does not reuse the unrelated ticket upload field or invent multipart encoding.
+
+## Handover checklist
+
+1. Run all verification commands above on the handover commit.
+2. Confirm API origin/prefixes for each EAS environment.
+3. Confirm the iOS bundle identifier and EAS project ownership.
+4. Obtain the observation attachment contract from the SAT backend owner and implement only the documented adapter encoding.
+5. Perform authenticated device acceptance tests with non-production credentials supplied out of band.
+6. Have the Apple account owner initiate the production build and TestFlight upload.
