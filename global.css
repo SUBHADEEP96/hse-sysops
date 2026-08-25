@@ -1,0 +1,10 @@
+@import "tailwindcss";
+@import "nativewind/theme";
+
+@theme {
+  --color-brand: #dc2626;
+  --color-ink: #172033;
+  --color-canvas: #f5f6f8;
+  --color-success: #15803d;
+  --color-warning: #b45309;
+}
