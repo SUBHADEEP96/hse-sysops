@@ -70,6 +70,27 @@ describe("audit lookup contracts", () => {
     ]);
   });
 
+  test("normalizes audit status identifiers and nested status objects", async () => {
+    mockedRequest.mockResolvedValueOnce({
+      audits: [
+        { id: 1, audit_name: "Open", audit_status_id: 1 },
+        { id: 2, audit_name: "Progress", statusId: "3" },
+        { id: 3, audit_name: "Closed", status: { id: 2, name: "Closed" } },
+      ],
+    });
+
+    await expect(getAudits()).resolves.toEqual([
+      { id: "1", audit_name: "Open", audit_status_id: 1, status_id: 1 },
+      { id: "2", audit_name: "Progress", statusId: "3", status_id: 3 },
+      {
+        id: "3",
+        audit_name: "Closed",
+        status: { id: 2, name: "Closed" },
+        status_id: 2,
+      },
+    ]);
+  });
+
   test("submits the exact documented create-audit payload", async () => {
     mockedRequest.mockResolvedValueOnce({ id: 1 });
     const payload = {

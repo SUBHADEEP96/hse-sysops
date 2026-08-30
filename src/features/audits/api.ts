@@ -30,6 +30,49 @@ type LookupDto = Record<string, unknown>;
 const isRecord = (value: unknown): value is LookupDto =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+function normalizeAudit(row: LookupDto): Audit | null {
+  const rawId = row.id ?? row.audit_id;
+  if (typeof rawId !== "string" && typeof rawId !== "number") return null;
+  const id = String(rawId).trim();
+  if (!id) return null;
+
+  const rawStatus =
+    row.status_id ??
+    row.audit_status_id ??
+    row.statusId ??
+    row.auditStatus ??
+    row.status_name ??
+    row.audit_status_name ??
+    row.audit_status ??
+    row.status;
+  const status = isRecord(rawStatus)
+    ? (rawStatus.id ??
+      rawStatus.status_id ??
+      rawStatus.name ??
+      rawStatus.label ??
+      rawStatus.status)
+    : rawStatus;
+  const normalizedStatusId =
+    typeof status === "number"
+      ? status
+      : typeof status === "string" && /^\d+$/.test(status.trim())
+        ? Number(status)
+        : undefined;
+  const normalizedStatus =
+    typeof status === "string" && !/^\d+$/.test(status.trim())
+      ? status.trim()
+      : undefined;
+
+  return {
+    ...row,
+    id,
+    ...(normalizedStatusId === undefined
+      ? {}
+      : { status_id: normalizedStatusId }),
+    ...(normalizedStatus === undefined ? {} : { status: normalizedStatus }),
+  } as Audit;
+}
+
 function normalizeAudits(value: unknown): Audit[] {
   const rows = Array.isArray(value)
     ? value
@@ -42,12 +85,10 @@ function normalizeAudits(value: unknown): Audit[] {
   const audits: Audit[] = [];
   for (const row of rows) {
     if (!isRecord(row)) continue;
-    const rawId = row.id ?? row.audit_id;
-    if (typeof rawId !== "string" && typeof rawId !== "number") continue;
-    const id = String(rawId).trim();
-    if (!id || unique.has(id)) continue;
-    unique.add(id);
-    audits.push({ ...row, id });
+    const audit = normalizeAudit(row);
+    if (!audit || unique.has(String(audit.id))) continue;
+    unique.add(String(audit.id));
+    audits.push(audit);
   }
   return audits;
 }
@@ -103,7 +144,13 @@ export async function getAudits(
   );
 }
 export const getAudit = (id: string) =>
-  request<Audit>("sat", `${routes.audits}/${encodeURIComponent(id)}`);
+  request<unknown>("sat", `${routes.audits}/${encodeURIComponent(id)}`).then(
+    (value) => {
+      const row =
+        isRecord(value) && isRecord(value.audit) ? value.audit : value;
+      return normalizeAudit(isRecord(row) ? row : {}) ?? { id };
+    },
+  );
 export const getAuditForms = (id: string) =>
   request<unknown[]>("sat", `${routes.audits}/${encodeURIComponent(id)}/forms`);
 export const getAuditSubmissions = (id: string) =>

@@ -1,25 +1,52 @@
+import { queryClient } from "@/src/api/query-client";
+import {
+    Button,
+    Card,
+    ErrorState,
+    LoadingState,
+    Screen,
+    StatusBadge,
+} from "@/src/components/ui";
+import {
+    auditKeys,
+    getAudit,
+    getAuditForms,
+    getAuditSubmissions,
+    updateAuditStatus,
+} from "@/src/features/audits/api";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Alert, Text, View } from "react-native";
-import {
-  Button,
-  Card,
-  ErrorState,
-  LoadingState,
-  Screen,
-  StatusBadge,
-} from "@/src/components/ui";
-import {
-  auditKeys,
-  getAudit,
-  updateAuditStatus,
-} from "@/src/features/audits/api";
-import { queryClient } from "@/src/api/query-client";
+
+type DetailRow = Record<string, unknown>;
+const isRecord = (value: unknown): value is DetailRow =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+const rows = (value: unknown, keys: string[]) => {
+  if (Array.isArray(value)) return value.filter(isRecord);
+  if (!isRecord(value)) return [];
+  for (const key of keys) {
+    if (Array.isArray(value[key])) return value[key].filter(isRecord);
+  }
+  return [];
+};
+const textValue = (value: unknown, fallback: string) =>
+  typeof value === "string" || typeof value === "number"
+    ? String(value)
+    : fallback;
+
 export default function AuditDetail() {
   const { auditId } = useLocalSearchParams<{ auditId: string }>();
   const q = useQuery({
     queryKey: auditKeys.detail(auditId),
     queryFn: () => getAudit(auditId),
+  });
+  const forms = useQuery({
+    queryKey: ["audits", auditId, "forms"],
+    queryFn: () => getAuditForms(auditId),
+  });
+  const submissions = useQuery({
+    queryKey: ["audits", auditId, "submissions"],
+    queryFn: () => getAuditSubmissions(auditId),
   });
   const status = useMutation({
     mutationFn: (s: 1 | 2 | 3) => updateAuditStatus(auditId, s),
@@ -64,6 +91,42 @@ export default function AuditDetail() {
         </Text>
         <StatusBadge status={a.status_id ?? a.status ?? "Unknown"} />
       </Card>
+      <Text className="mb-2 mt-4 text-lg font-bold text-ink">Audit contents</Text>
+      {forms.error ? (
+        <Text className="mb-2 text-red-700">Unable to load audit forms.</Text>
+      ) : null}
+      {submissions.error ? (
+        <Text className="mb-2 text-red-700">
+          Unable to load submitted observations.
+        </Text>
+      ) : null}
+      {forms.isLoading || submissions.isLoading ? <LoadingState /> : null}
+      {!forms.isLoading && !submissions.isLoading ? (
+        <Card>
+          <Text className="mb-1 font-semibold text-ink">
+            Forms: {rows(forms.data, ["forms", "rows"]).length}
+          </Text>
+          <Text className="mb-3 text-slate-600">
+            Observations: {rows(submissions.data, ["submissions", "rows"]).length}
+          </Text>
+          {rows(submissions.data, ["submissions", "rows"]).map((submission, index) => (
+            <View key={String(submission.id ?? index)} className="mb-2 border-b border-slate-200 pb-2">
+              <Text className="font-semibold text-ink">
+                {textValue(
+                  submission.form_name ?? submission.name ?? submission.title,
+                  `Observation ${index + 1}`,
+                )}
+              </Text>
+              <Text className="text-slate-600">
+                {textValue(
+                  submission.status ?? submission.submission_status,
+                  "Submitted",
+                )}
+              </Text>
+            </View>
+          ))}
+        </Card>
+      ) : null}
       <Text className="mb-2 mt-3 text-lg font-bold text-ink">Status</Text>
       <View className="mb-5 gap-2">
         <Button
