@@ -1,3 +1,5 @@
+import { Button, Screen, TextField } from "@/src/components/ui";
+import { useAuth } from "@/src/features/auth/session";
 import React, { useState } from "react";
 import {
   Image,
@@ -6,8 +8,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { Button, Screen, TextField } from "@/src/components/ui";
-import { useAuth } from "@/src/features/auth/session";
 export default function Login() {
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
@@ -32,15 +32,17 @@ export default function Login() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <Screen>
-        <View className="flex-1 justify-center">
+        <View className="flex-1 justify-center mt-20 ">
           <Image
             source={require("../../assets/images/icon.png")}
             className="mb-5 h-24 w-24 self-center"
             resizeMode="contain"
             accessibilityLabel="HSE logo"
           />
-          <Text className="text-3xl font-bold text-ink">Safety Audit Tool</Text>
-          <Text className="mb-8 mt-2 text-base text-slate-600">
+          <Text className="text-3xl font-bold text-ink text-center">
+            Safety Audit Tool
+          </Text>
+          <Text className="mb-8 mt-2 text-base text-slate-600 text-center">
             Sign in with your HSE account
           </Text>
           <TextField

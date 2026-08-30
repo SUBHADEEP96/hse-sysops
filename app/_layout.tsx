@@ -1,9 +1,9 @@
-import "../global.css";
+import { queryClient } from "@/src/api/query-client";
+import { AuthProvider } from "@/src/features/auth/session";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { queryClient } from "@/src/api/query-client";
-import { AuthProvider } from "@/src/features/auth/session";
+import "../global.css";
 
 export default function RootLayout() {
   return (
@@ -18,7 +18,7 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
           <Stack.Screen name="(app)" options={{ headerShown: false }} />
         </Stack>
       </AuthProvider>

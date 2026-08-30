@@ -1,9 +1,10 @@
 import { request } from "@/src/api/http-client";
 import {
-  createAudit,
-  getLocations,
-  normalizeCountries,
-  normalizeLocations,
+    createAudit,
+    getAudits,
+    getLocations,
+    normalizeCountries,
+    normalizeLocations,
 } from "./api";
 
 jest.mock("@/src/api/http-client", () => ({ request: jest.fn() }));
@@ -51,6 +52,22 @@ describe("audit lookup contracts", () => {
       "sat",
       "/locations/country/country%207",
     );
+  });
+
+  test("normalizes audit identifiers and removes duplicate or missing rows", async () => {
+    mockedRequest.mockResolvedValueOnce({
+      audits: [
+        { audit_id: 7, audit_name: "First" },
+        { id: "7", audit_name: "Duplicate" },
+        { audit_name: "Missing ID" },
+        { id: 8, audit_name: "Second" },
+      ],
+    });
+
+    await expect(getAudits()).resolves.toEqual([
+      { audit_id: 7, audit_name: "First", id: "7" },
+      { id: "8", audit_name: "Second" },
+    ]);
   });
 
   test("submits the exact documented create-audit payload", async () => {

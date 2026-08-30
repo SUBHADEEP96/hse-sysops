@@ -30,6 +30,28 @@ type LookupDto = Record<string, unknown>;
 const isRecord = (value: unknown): value is LookupDto =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+function normalizeAudits(value: unknown): Audit[] {
+  const rows = Array.isArray(value)
+    ? value
+    : isRecord(value) && Array.isArray(value.rows)
+      ? value.rows
+      : isRecord(value) && Array.isArray(value.audits)
+        ? value.audits
+        : [];
+  const unique = new Set<string>();
+  const audits: Audit[] = [];
+  for (const row of rows) {
+    if (!isRecord(row)) continue;
+    const rawId = row.id ?? row.audit_id;
+    if (typeof rawId !== "string" && typeof rawId !== "number") continue;
+    const id = String(rawId).trim();
+    if (!id || unique.has(id)) continue;
+    unique.add(id);
+    audits.push({ ...row, id });
+  }
+  return audits;
+}
+
 function lookupRows(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   if (!isRecord(value)) return [];
@@ -66,9 +88,6 @@ export const normalizeCountries = (value: unknown): Country[] =>
   normalizeLookup(value, "country_id", "country_name");
 export const normalizeLocations = (value: unknown): Location[] =>
   normalizeLookup(value, "location_id", "location_name");
-const list = <T>(value: T[] | { rows?: T[]; audits?: T[] }) =>
-  Array.isArray(value) ? value : (value.rows ?? value.audits ?? []);
-
 export const auditKeys = {
   all: ["audits"] as const,
   detail: (id: string) => ["audits", id] as const,
@@ -79,11 +98,8 @@ export const auditKeys = {
 export async function getAudits(
   scope: "my_audits" | "my_location" = "my_audits",
 ) {
-  return list(
-    await request<Audit[] | { rows?: Audit[] }>(
-      "sat",
-      `${routes.audits}?scope=${scope}`,
-    ),
+  return normalizeAudits(
+    await request<unknown>("sat", `${routes.audits}?scope=${scope}`),
   );
 }
 export const getAudit = (id: string) =>
