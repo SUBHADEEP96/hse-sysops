@@ -13,8 +13,6 @@ export const routes = {
   submissions: "/submissions",
   countries: "/countries",
   locations: "/locations",
-  locationsForCountry: (countryId: string) =>
-    `/locations/country/${encodeURIComponent(countryId)}`,
   likelihood: "/rpn/likelihood",
   severity: "/rpn/severity",
   notifications: "/notifications",

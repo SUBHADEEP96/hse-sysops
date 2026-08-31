@@ -32,10 +32,8 @@ export default function CreateAudit() {
     queryFn: getCountries,
   });
   const locations = useQuery({
-    queryKey: auditKeys.locations(selectedCountryId),
-    queryFn: () =>
-      selectedCountryId ? getLocations(selectedCountryId) : Promise.resolve([]),
-    enabled: selectedCountryId !== null,
+    queryKey: auditKeys.locations,
+    queryFn: getLocations,
   });
   const mutation = useMutation({
     mutationFn: createAudit,
@@ -98,7 +96,10 @@ export default function CreateAudit() {
         onSelect={setSelectedLocationId}
       />
       {locations.error ? (
-        <ErrorState message={locations.error.message} retry={() => void locations.refetch()} />
+        <ErrorState
+          message={locations.error.message}
+          retry={() => void locations.refetch()}
+        />
       ) : null}
       <TextField
         label="Work area"
