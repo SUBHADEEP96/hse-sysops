@@ -10,6 +10,7 @@ import {
   type TextInputProps,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { auditStatusLabel, normalizeAuditStatus } from "@/src/features/audits/model";
 
 export function Screen({
   children,
@@ -76,17 +77,44 @@ export function Button({
 export function TextField({
   label,
   error,
+  leftIcon,
+  rightIcon,
+  onRightIconPress,
+  rightIconAccessibilityLabel,
   ...props
-}: TextInputProps & { label: string; error?: string }) {
+}: TextInputProps & {
+  label: string;
+  error?: string;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
+  onRightIconPress?: () => void;
+  rightIconAccessibilityLabel?: string;
+}) {
   return (
     <View className="mb-4">
       <Text className="mb-2 font-semibold text-ink">{label}</Text>
-      <TextInput
-        accessibilityLabel={label}
-        className={`min-h-12 rounded-xl border bg-white px-4 text-base text-ink ${error ? "border-red-600" : "border-slate-300"}`}
-        placeholderTextColor="#64748b"
-        {...props}
-      />
+      <View
+        className={`min-h-12 flex-row items-center rounded-xl border bg-white ${error ? "border-red-600" : "border-slate-300"}`}
+      >
+        {leftIcon ? <View className="ml-4">{leftIcon}</View> : null}
+        <TextInput
+          accessibilityLabel={label}
+          className="min-h-12 flex-1 px-4 text-base text-ink"
+          placeholderTextColor="#64748b"
+          {...props}
+        />
+        {rightIcon ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={rightIconAccessibilityLabel}
+            className="min-h-11 min-w-11 items-center justify-center"
+            disabled={!onRightIconPress}
+            onPress={onRightIconPress}
+          >
+            {rightIcon}
+          </Pressable>
+        ) : null}
+      </View>
       {error ? (
         <Text accessibilityRole="alert" className="mt-1 text-sm text-red-700">
           {error}
@@ -134,14 +162,7 @@ export function ErrorState({
   );
 }
 export function StatusBadge({ status }: { status: number | string }) {
-  const label =
-    String(status) === "1"
-      ? "Open"
-      : String(status) === "2"
-        ? "Closed"
-        : String(status) === "3"
-          ? "In Progress"
-          : String(status);
+  const label = auditStatusLabel(normalizeAuditStatus(status));
   return (
     <View className="self-start rounded-full bg-slate-100 px-3 py-1">
       <Text className="text-sm font-semibold text-slate-700">{label}</Text>

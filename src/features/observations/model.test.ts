@@ -2,7 +2,7 @@ import {
   ObservationAttachmentAdapter,
   validateAttachment,
 } from "./attachments";
-import { buildSubmission, calculateRpn } from "./model";
+import { buildSubmission, calculateRpn, toggleMultiSelect } from "./model";
 
 describe("observation contract helpers", () => {
   test.each([
@@ -42,5 +42,9 @@ describe("observation contract helpers", () => {
       }),
     ).toMatch(/10 MB/);
     expect(ObservationAttachmentAdapter.canSubmit).toBe(false);
+  });
+  test("toggles multi-select without duplicates in option order", () => {
+    expect(toggleMultiSelect(["head"], "eye", ["body", "head", "eye"])).toEqual(["head", "eye"]);
+    expect(toggleMultiSelect(["head", "eye"], "head", ["body", "head", "eye"])).toEqual(["eye"]);
   });
 });
