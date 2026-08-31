@@ -17,6 +17,7 @@ import {
     validateAttachment,
 } from "@/src/features/observations/attachments";
 import { DynamicFormRenderer } from "@/src/features/observations/DynamicFormRenderer";
+import { ImageAnnotationEditor } from "@/src/features/observations/annotation/ImageAnnotationEditor";
 import type {
     AnswerValue,
     Attachment,
@@ -26,7 +27,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Image, Modal, Pressable, Text, View } from "react-native";
 export default function Observation() {
   const { auditId, mode } = useLocalSearchParams<{
     auditId: string;
@@ -39,6 +40,8 @@ export default function Observation() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<Attachment[]>([]);
   const [fileError, setFileError] = useState("");
+  const [annotating, setAnnotating] = useState<number | null>(null);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
   const forms = useQuery({
     queryKey: ["forms", "selection"],
     queryFn: getForms,
@@ -194,10 +197,7 @@ export default function Observation() {
           />
           <Card>
             <Text className="mb-2 font-bold text-ink">Attachments</Text>
-            <Text className="mb-3 text-sm text-slate-600">
-              Choose files now. Attachment submission remains disabled until the
-              backend defines its encoding.
-            </Text>
+            <Text className="mb-3 text-sm text-slate-600">Add photographic evidence or a supporting document.</Text>
             <View className="gap-2">
               <Button
                 title="Take photo"
@@ -216,13 +216,18 @@ export default function Observation() {
               />
             </View>
             {files.map((f, i) => (
-              <Pressable
-                accessibilityLabel={`Remove ${f.name}`}
-                key={`${f.uri}-${i}`}
-                onPress={() => setFiles((v) => v.filter((_, x) => x !== i))}
-              >
-                <Text className="mt-3 text-brand">{f.name} · Remove</Text>
-              </Pressable>
+              <View key={`${f.uri}-${i}`} className="mt-3 rounded-xl border border-slate-200 p-3">
+                {f.mimeType?.startsWith("image/") ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Preview ${f.name}`} onPress={() => setPreviewUri(f.uri)}>
+                    <Image source={{ uri: f.uri }} resizeMode="cover" className="h-40 w-full rounded-lg" />
+                  </Pressable>
+                ) : null}
+                <Text className="mt-2 font-medium text-ink">{f.name}{f.annotated ? " · Marked" : ""}</Text>
+                <View className="mt-2 flex-row gap-2">
+                  {f.mimeType?.startsWith("image/") ? <Button title={f.annotated ? "Edit marking" : "Mark image"} variant="secondary" accessibilityLabel="Mark image" onPress={() => setAnnotating(i)} /> : null}
+                  <Button title="Remove" variant="danger" accessibilityLabel="Remove attachment" onPress={() => setFiles((v) => v.filter((_, x) => x !== i))} />
+                </View>
+              </View>
             ))}
             {fileError ? (
               <Text className="mt-2 text-red-700">{fileError}</Text>
@@ -236,6 +241,22 @@ export default function Observation() {
             disabled={mutation.isPending}
             onPress={submit}
           />
+          {annotating !== null && files[annotating] ? (
+            <ImageAnnotationEditor
+              visible
+              imageUri={files[annotating].originalUri ?? files[annotating].uri}
+              onCancel={() => setAnnotating(null)}
+              onSave={(uri) => {
+                setFiles((current) => current.map((file, index) => index === annotating ? { ...file, uri, originalUri: file.originalUri ?? file.uri, annotated: true, name: `marked-${file.name.replace(/^marked-/, "")}` } : file));
+                setAnnotating(null);
+              }}
+            />
+          ) : null}
+          <Modal visible={previewUri !== null} transparent animationType="fade" onRequestClose={() => setPreviewUri(null)}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Close image preview" onPress={() => setPreviewUri(null)} className="flex-1 items-center justify-center bg-black/90 p-4">
+              {previewUri ? <Image source={{ uri: previewUri }} resizeMode="contain" className="h-full w-full" /> : null}
+            </Pressable>
+          </Modal>
         </>
       ) : null}
     </Screen>

@@ -68,7 +68,8 @@ describe("dashboard normalization", () => {
       { observations: [{ status: "Open", count: 17 }, { status: "Closed", count: 12 }] },
     );
 
-    expect(buildChartSeries(result.sections[4].metrics)).toEqual([
+    const rpn = result.sections.find((section) => section.key === "rpn_distribution");
+    expect(buildChartSeries(rpn?.metrics ?? [])).toEqual([
       expect.objectContaining({ label: "Low", value: 33 }),
       expect.objectContaining({ label: "Medium", value: 8 }),
     ]);

@@ -16,7 +16,9 @@
         "NSCameraUsageDescription": "Allow HSE SAT to photograph observation evidence.",
         "NSPhotoLibraryUsageDescription": "Allow HSE SAT to select observation evidence from your library."
       },
-      "config": { "usesNonExemptEncryption": false }
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -53,7 +55,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

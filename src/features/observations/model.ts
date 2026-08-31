@@ -10,6 +10,8 @@ export type Attachment = {
   name: string;
   mimeType?: string;
   size?: number;
+  originalUri?: string;
+  annotated?: boolean;
 };
 export type Question = {
   id: string | number;
@@ -51,4 +53,22 @@ export function calculateRpn(likelihood: number, severity: number) {
     valid: [1, 2, 4, 8, 16, 32, 64, 128].includes(score),
     critical: score >= 32 && score <= 128,
   };
+}
+
+export function toggleMultiSelect(
+  current: AnswerValue,
+  option: string | number,
+  optionOrder: (string | number)[],
+): (string | number)[] {
+  const selected = new Set<string | number>(
+    Array.isArray(current)
+      ? current.filter(
+          (value): value is string | number =>
+            typeof value === "string" || typeof value === "number",
+        )
+      : [],
+  );
+  if (selected.has(option)) selected.delete(option);
+  else selected.add(option);
+  return optionOrder.filter((value) => selected.has(value));
 }

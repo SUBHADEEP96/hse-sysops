@@ -1,5 +1,6 @@
 import { Button, Screen, TextField } from "@/src/components/ui";
 import { useAuth } from "@/src/features/auth/session";
+import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   Image,
@@ -13,8 +14,10 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [error, setError] = useState("");
   async function submit() {
+    if (busy) return;
     if (!email || !password) return setError("Enter your email and password.");
     setBusy(true);
     setError("");
@@ -47,6 +50,7 @@ export default function Login() {
           </Text>
           <TextField
             label="Email"
+            leftIcon={<Ionicons name="mail-outline" size={20} color="#64748b" />}
             autoCapitalize="none"
             keyboardType="email-address"
             autoComplete="email"
@@ -55,7 +59,19 @@ export default function Login() {
           />
           <TextField
             label="Password"
-            secureTextEntry
+            leftIcon={<Ionicons name="lock-closed-outline" size={20} color="#64748b" />}
+            rightIcon={
+              <Ionicons
+                name={passwordVisible ? "eye-off-outline" : "eye-outline"}
+                size={22}
+                color="#475569"
+              />
+            }
+            onRightIconPress={() => setPasswordVisible((visible) => !visible)}
+            rightIconAccessibilityLabel={
+              passwordVisible ? "Hide password" : "Show password"
+            }
+            secureTextEntry={!passwordVisible}
             autoComplete="current-password"
             value={password}
             onChangeText={setPassword}

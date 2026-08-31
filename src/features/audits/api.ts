@@ -7,6 +7,8 @@ export type Audit = {
   name?: string;
   location?: string | { name?: string };
   auditor?: string;
+  auditor_name?: string;
+  created_at?: string;
   status_id?: number;
   status?: string;
 };
@@ -31,7 +33,7 @@ type LookupDto = Record<string, unknown>;
 const isRecord = (value: unknown): value is LookupDto =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-function normalizeAudit(row: LookupDto): Audit | null {
+export function normalizeAudit(row: LookupDto): Audit | null {
   const rawId = row.id ?? row.audit_id;
   if (typeof rawId !== "string" && typeof rawId !== "number") return null;
   const id = String(rawId).trim();
@@ -74,7 +76,7 @@ function normalizeAudit(row: LookupDto): Audit | null {
   } as Audit;
 }
 
-function normalizeAudits(value: unknown): Audit[] {
+export function normalizeAudits(value: unknown): Audit[] {
   const rows = Array.isArray(value)
     ? value
     : isRecord(value) && Array.isArray(value.rows)
@@ -114,6 +116,7 @@ function normalizeLookup(
 
     const aliasesId = [
       idKey,
+      idKey.replace(/^./, (letter) => letter.toUpperCase()),
       idKey.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
       idKey.replace(/_/g, ""),
       idKey.replace(/^./, (letter) => letter.toUpperCase()).replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
@@ -122,6 +125,7 @@ function normalizeLookup(
 
     const aliasesName = [
       nameKey,
+      nameKey.replace(/^./, (letter) => letter.toUpperCase()),
       nameKey.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
       nameKey.replace(/_/g, ""),
       nameKey.replace(/^./, (letter) => letter.toUpperCase()).replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
@@ -257,14 +261,5 @@ export const getLocationsByCountry = async (countryId: string | number) => {
     );
   });
 
-  const result = filtered.length ? filtered : rows;
-  console.log("[debug] locations for country", {
-    countryId,
-    raw,
-    filteredRows: filtered,
-    result,
-  });
-  
-
-  return normalizeLocations(result);
+  return normalizeLocations(filtered.length ? filtered : rows);
 };
