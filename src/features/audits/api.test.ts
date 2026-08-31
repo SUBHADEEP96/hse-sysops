@@ -76,13 +76,24 @@ describe("audit lookup contracts", () => {
     ]);
   });
 
-  test("requests only the selected country's dependent location endpoint", async () => {
+  test("requests the documented locations endpoint", async () => {
     mockedRequest.mockResolvedValueOnce([]);
-    await getLocations("country 7");
-    expect(mockedRequest).toHaveBeenCalledWith(
-      "sat",
-      "/locations/country/country%207",
-    );
+    await getLocations();
+    expect(mockedRequest).toHaveBeenCalledWith("sat", "/locations");
+  });
+
+  test("normalizes location names and nested data envelopes returned by the API", () => {
+    expect(
+      normalizeLocations({
+        data: [
+          { id: 1, location: "Perth" },
+          { location_id: 2, location_name: "Sydney" },
+        ],
+      }),
+    ).toEqual([
+      { id: "1", name: "Perth" },
+      { id: "2", name: "Sydney" },
+    ]);
   });
 
   test("normalizes audit identifiers and removes duplicate or missing rows", async () => {
@@ -136,6 +147,19 @@ describe("audit lookup contracts", () => {
       method: "POST",
       body: payload,
     });
+  });
+
+  test("normalizes audit_id in the create response for detail navigation", async () => {
+    mockedRequest.mockResolvedValueOnce({ audit: { audit_id: 91 } });
+
+    await expect(
+      createAudit({
+        auditor_id: 42,
+        audit_name: "Site audit",
+        country: "7",
+        location: "11",
+      }),
+    ).resolves.toMatchObject({ id: "91", audit_id: 91 });
   });
 
   test("submits the documented audit status field", async () => {

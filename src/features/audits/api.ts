@@ -97,7 +97,7 @@ function normalizeAudits(value: unknown): Audit[] {
 function lookupRows(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   if (!isRecord(value)) return [];
-  for (const key of ["rows", "countries", "locations"]) {
+  for (const key of ["rows", "countries", "locations", "data"]) {
     if (Array.isArray(value[key])) return value[key];
   }
   return [];
@@ -118,7 +118,13 @@ function normalizeLookup(
       letter.toUpperCase(),
     );
     const rawId = row[idKey] ?? row[camelIdKey] ?? row.id;
-    const rawName = row[nameKey] ?? row[camelNameKey] ?? row.name ?? row.label;
+    const lookupNameKey = nameKey === "country_name" ? "country" : "location";
+    const rawName =
+      row[nameKey] ??
+      row[camelNameKey] ??
+      row.name ??
+      row.label ??
+      row[lookupNameKey];
     if (
       (typeof rawId !== "string" && typeof rawId !== "number") ||
       (typeof rawName !== "string" && typeof rawName !== "number")
@@ -140,8 +146,7 @@ export const auditKeys = {
   all: ["audits"] as const,
   detail: (id: string) => ["audits", id] as const,
   countries: ["audit-lookups", "countries"] as const,
-  locations: (countryId: string | null) =>
-    ["audit-lookups", "locations", countryId] as const,
+  locations: ["audit-lookups", "locations"] as const,
 };
 export async function getAudits(
   scope: "my_audits" | "my_location" = "my_audits",
@@ -170,8 +175,14 @@ export const getOpeningPairs = (id: string) =>
     "sat",
     `${routes.audits}/${encodeURIComponent(id)}/opening-closing-pairs`,
   );
-export const createAudit = (payload: AuditPayload) =>
-  request<Audit>("sat", routes.audits, { method: "POST", body: payload });
+export const createAudit = async (payload: AuditPayload) => {
+  const value = await request<unknown>("sat", routes.audits, {
+    method: "POST",
+    body: payload,
+  });
+  const row = isRecord(value) && isRecord(value.audit) ? value.audit : value;
+  return normalizeAudit(isRecord(row) ? row : {}) ?? (value as Audit);
+};
 export const updateAuditStatus = (id: string, status_id: 1 | 2 | 3) =>
   request<Audit>("sat", `${routes.audits}/${encodeURIComponent(id)}/status`, {
     method: "PATCH",
@@ -207,7 +218,5 @@ export const getForms = async () =>
   normalizeForms(await request<unknown>("sat", routes.forms));
 export const getCountries = async () =>
   normalizeCountries(await request<unknown>("sat", routes.countries));
-export const getLocations = async (countryId: string) =>
-  normalizeLocations(
-    await request<unknown>("sat", routes.locationsForCountry(countryId)),
-  );
+export const getLocations = async () =>
+  normalizeLocations(await request<unknown>("sat", routes.locations));
