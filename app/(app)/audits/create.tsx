@@ -113,7 +113,14 @@ export default function CreateAudit() {
       <TextField
         label="Work area"
         value={workArea}
-        onChangeText={(value) => fields.setValue("workArea", value)}
+        onChangeText={(value) => {
+          console.log("[debug] work_area field changed", {
+            work_area: value,
+            isEmpty: !value.trim(),
+          });
+          fields.setValue("workArea", value);
+        }}
+        placeholder="Enter work area (optional)"
       />
       {mutation.error ? (
         <Text accessibilityRole="alert" className="mb-3 text-red-700">
@@ -125,13 +132,18 @@ export default function CreateAudit() {
         disabled={!valid || mutation.isPending}
         onPress={() => {
           if (!user || !selectedCountryId || !selectedLocationId) return;
-          mutation.mutate({
+          const payload = {
             auditor_id: user.id,
             audit_name: name.trim(),
             country: selectedCountryId,
             location: selectedLocationId,
             ...(workArea.trim() ? { work_area: workArea.trim() } : {}),
+          };
+          console.log("[debug] Creating audit with payload:", {
+            payload,
+            work_area: workArea.trim() || "(empty - not sent)",
           });
+          mutation.mutate(payload);
         }}
       />
     </Screen>

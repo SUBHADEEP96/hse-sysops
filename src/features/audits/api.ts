@@ -247,6 +247,10 @@ export const getLocationsByCountry = async (countryId: string | number) => {
       row.locationCountryId,
       row.location_country_name,
       row.locationCountryName,
+      row.work_area_country_id,
+      row.workAreaCountryId,
+      row.work_area_country_name,
+      row.workAreaCountryName,
     ];
     return candidates.some(
       (value) => value !== undefined && String(value).trim() === String(countryId).trim(),
@@ -260,6 +264,7 @@ export const getLocationsByCountry = async (countryId: string | number) => {
     filteredRows: filtered,
     result,
   });
+  
 
   return normalizeLocations(result);
 };
