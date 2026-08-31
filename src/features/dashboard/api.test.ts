@@ -1,4 +1,8 @@
-import { normalizeDashboard, normalizeMetrics } from "./api";
+import {
+    buildChartSeries,
+    normalizeDashboard,
+    normalizeMetrics,
+} from "./api";
 
 describe("dashboard normalization", () => {
   test("normalizes documented dashboard sections and preserves zero", () => {
@@ -51,5 +55,26 @@ describe("dashboard normalization", () => {
   test("marks wholly malformed responses as unavailable", () => {
     expect(normalizeDashboard("bad", null, {}).empty).toBe(true);
     expect(normalizeDashboard(null, null, []).criticalAuditCount).toBeNull();
+  });
+
+  test("builds chart-ready data from the existing dashboard sections", () => {
+    const result = normalizeDashboard(
+      {
+        stats: { total: 14, compliant: 36 },
+        rpn_distribution: { low: 33, medium: 8 },
+        answer_types: { "single_selection_dropdown": 112, text: 89 },
+      },
+      ["a1", "a2"],
+      { observations: [{ status: "Open", count: 17 }, { status: "Closed", count: 12 }] },
+    );
+
+    expect(buildChartSeries(result.sections[4].metrics)).toEqual([
+      expect.objectContaining({ label: "Low", value: 33 }),
+      expect.objectContaining({ label: "Medium", value: 8 }),
+    ]);
+    expect(buildChartSeries(result.observationMetrics)).toEqual([
+      expect.objectContaining({ label: "Open", value: 17 }),
+      expect.objectContaining({ label: "Closed", value: 12 }),
+    ]);
   });
 });

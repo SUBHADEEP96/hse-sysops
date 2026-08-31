@@ -34,6 +34,12 @@ export type DashboardViewModel = {
   empty: boolean;
 };
 
+export type DashboardChartPoint = {
+  key: string;
+  label: string;
+  value: number;
+};
+
 const SECTION_FIELDS = [
   ["stats", "Summary"],
   ["audit_completion", "Audit Completion"],
@@ -110,6 +116,25 @@ function sectionValue(dto: DashboardStatsDto, key: string): unknown {
     dto[key as keyof DashboardStatsDto] ??
     dto[camel as keyof DashboardStatsDto]
   );
+}
+
+export function buildChartSeries(metrics: DashboardMetric[]): DashboardChartPoint[] {
+  const numericMetrics = metrics
+    .map((metric) => {
+      const numericValue =
+        typeof metric.value === "number"
+          ? metric.value
+          : Number(String(metric.value).replace(/[^\d.-]/g, ""));
+      if (!Number.isFinite(numericValue) || numericValue <= 0) return null;
+      return {
+        key: metric.key,
+        label: metric.label,
+        value: numericValue,
+      };
+    })
+    .filter((metric): metric is DashboardChartPoint => metric !== null);
+
+  return numericMetrics;
 }
 
 export function normalizeDashboard(
