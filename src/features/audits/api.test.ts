@@ -4,7 +4,9 @@ import {
     getAudits,
     getLocations,
     normalizeCountries,
+    normalizeForms,
     normalizeLocations,
+    updateAuditStatus,
 } from "./api";
 
 jest.mock("@/src/api/http-client", () => ({ request: jest.fn() }));
@@ -43,6 +45,35 @@ describe("audit lookup contracts", () => {
     ]);
     expect(new Set(locations.map(({ id }) => id)).size).toBe(locations.length);
     expect(JSON.stringify(locations)).not.toContain("undefined");
+  });
+
+  test("normalizes camelCase dependent location fields", () => {
+    expect(
+      normalizeLocations({
+        locations: [
+          { locationId: 11, locationName: "Workshop" },
+          { locationId: 12, label: "Warehouse" },
+        ],
+      }),
+    ).toEqual([
+      { id: "11", name: "Workshop" },
+      { id: "12", name: "Warehouse" },
+    ]);
+  });
+
+  test("normalizes form selection envelopes and names", () => {
+    expect(
+      normalizeForms({
+        forms: [
+          { form_id: 1, formName: "Safety" },
+          { formId: "2", label: "Environment" },
+          { form_id: 1, form_name: "Duplicate" },
+        ],
+      }),
+    ).toEqual([
+      { id: "1", name: "Safety" },
+      { id: "2", name: "Environment" },
+    ]);
   });
 
   test("requests only the selected country's dependent location endpoint", async () => {
@@ -104,6 +135,17 @@ describe("audit lookup contracts", () => {
     expect(mockedRequest).toHaveBeenCalledWith("sat", "/audits", {
       method: "POST",
       body: payload,
+    });
+  });
+
+  test("submits the documented audit status field", async () => {
+    mockedRequest.mockResolvedValueOnce({ id: 7 });
+
+    await updateAuditStatus("7", 2);
+
+    expect(mockedRequest).toHaveBeenCalledWith("sat", "/audits/7/status", {
+      method: "PATCH",
+      body: { audit_status_id: 2 },
     });
   });
 });

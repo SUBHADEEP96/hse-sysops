@@ -1,32 +1,32 @@
-import * as DocumentPicker from "expo-document-picker";
-import * as ImagePicker from "expo-image-picker";
-import { router, useLocalSearchParams } from "expo-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
-import {
-  Button,
-  Card,
-  ErrorState,
-  LoadingState,
-  Screen,
-} from "@/src/components/ui";
 import { queryClient } from "@/src/api/query-client";
+import {
+    Button,
+    Card,
+    ErrorState,
+    LoadingState,
+    Screen,
+} from "@/src/components/ui";
 import { getForms, getOpeningPairs } from "@/src/features/audits/api";
 import { useAuth } from "@/src/features/auth/session";
 import {
-  getDynamicForm,
-  submitObservation,
+    getDynamicForm,
+    submitObservation,
 } from "@/src/features/observations/api";
 import {
-  ObservationAttachmentAdapter,
-  validateAttachment,
+    ObservationAttachmentAdapter,
+    validateAttachment,
 } from "@/src/features/observations/attachments";
 import { DynamicFormRenderer } from "@/src/features/observations/DynamicFormRenderer";
 import type {
-  AnswerValue,
-  Attachment,
+    AnswerValue,
+    Attachment,
 } from "@/src/features/observations/model";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
+import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
+import { Pressable, Text, View } from "react-native";
 export default function Observation() {
   const { auditId, mode } = useLocalSearchParams<{
     auditId: string;
@@ -145,15 +145,15 @@ export default function Observation() {
         Select {mode === "closing" ? "closing" : "opening"} form
       </Text>
       <View className="mb-5 flex-row flex-wrap gap-2">
-        {forms.data?.map((f) => (
+        {forms.data?.length ? forms.data.map((f) => (
           <Pressable
-            key={String(f.id)}
+            key={f.id}
             onPress={() => setFormId(String(f.id))}
             className={`min-h-11 justify-center rounded-xl border px-3 ${formId === String(f.id) ? "border-brand bg-red-50" : "border-slate-300 bg-white"}`}
           >
-            <Text>{f.form_name ?? f.name ?? String(f.id)}</Text>
+            <Text>{f.name}</Text>
           </Pressable>
-        ))}
+        )) : <Text className="text-slate-600">No forms are available.</Text>}
       </View>
       {mode === "closing" ? (
         <>
@@ -166,7 +166,7 @@ export default function Observation() {
                 const id = String(r.opening_sub_id ?? r.id ?? "");
                 return (
                   <Pressable
-                    key={id || i}
+                    key={`${id || "opening"}-${i}`}
                     onPress={() => setOpeningId(id)}
                     className={`mb-2 min-h-11 justify-center rounded-xl border px-3 ${openingId === id ? "border-brand bg-red-50" : "border-slate-300 bg-white"}`}
                   >

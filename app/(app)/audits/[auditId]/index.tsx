@@ -110,7 +110,10 @@ export default function AuditDetail() {
             Observations: {rows(submissions.data, ["submissions", "rows"]).length}
           </Text>
           {rows(submissions.data, ["submissions", "rows"]).map((submission, index) => (
-            <View key={String(submission.id ?? index)} className="mb-2 border-b border-slate-200 pb-2">
+            <View
+              key={`${String(submission.id ?? "submission")}-${index}`}
+              className="mb-2 border-b border-slate-200 pb-2"
+            >
               <Text className="font-semibold text-ink">
                 {textValue(
                   submission.form_name ?? submission.name ?? submission.title,

@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import {
-  FlatList,
-  Modal,
-  Pressable,
-  Text,
-  TextInput,
-  View,
+    FlatList,
+    Modal,
+    Pressable,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -82,7 +82,7 @@ export function LookupSelector({
           />
           <FlatList
             data={filtered}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <Text className="px-5 py-8 text-center text-slate-600">

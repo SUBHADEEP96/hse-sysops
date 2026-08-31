@@ -25,6 +25,7 @@ export type AuditPayload = {
 };
 export type Country = { id: string; name: string };
 export type Location = { id: string; name: string };
+export type FormOption = { id: string; name: string };
 
 type LookupDto = Record<string, unknown>;
 const isRecord = (value: unknown): value is LookupDto =>
@@ -110,8 +111,14 @@ function normalizeLookup(
   const unique = new Map<string, { id: string; name: string }>();
   for (const row of lookupRows(value)) {
     if (!isRecord(row)) continue;
-    const rawId = row[idKey] ?? row.id;
-    const rawName = row[nameKey] ?? row.name;
+    const camelIdKey = idKey.replace(/_([a-z])/g, (_, letter: string) =>
+      letter.toUpperCase(),
+    );
+    const camelNameKey = nameKey.replace(/_([a-z])/g, (_, letter: string) =>
+      letter.toUpperCase(),
+    );
+    const rawId = row[idKey] ?? row[camelIdKey] ?? row.id;
+    const rawName = row[nameKey] ?? row[camelNameKey] ?? row.name ?? row.label;
     if (
       (typeof rawId !== "string" && typeof rawId !== "number") ||
       (typeof rawName !== "string" && typeof rawName !== "number")
@@ -168,13 +175,36 @@ export const createAudit = (payload: AuditPayload) =>
 export const updateAuditStatus = (id: string, status_id: 1 | 2 | 3) =>
   request<Audit>("sat", `${routes.audits}/${encodeURIComponent(id)}/status`, {
     method: "PATCH",
-    body: { status_id },
+    body: { audit_status_id: status_id },
   });
-export const getForms = () =>
-  request<{ id: string | number; name?: string; form_name?: string }[]>(
-    "sat",
-    routes.forms,
-  );
+export const normalizeForms = (value: unknown): FormOption[] => {
+  const rows = Array.isArray(value)
+    ? value
+    : isRecord(value) && Array.isArray(value.forms)
+      ? value.forms
+      : isRecord(value) && Array.isArray(value.rows)
+        ? value.rows
+        : [];
+  const unique = new Map<string, FormOption>();
+  for (const row of rows) {
+    if (!isRecord(row)) continue;
+    const rawId = row.id ?? row.form_id ?? row.formId;
+    const rawName =
+      row.form_name ?? row.formName ?? row.name ?? row.label ?? rawId;
+    if (
+      (typeof rawId !== "string" && typeof rawId !== "number") ||
+      (typeof rawName !== "string" && typeof rawName !== "number")
+    )
+      continue;
+    const id = String(rawId).trim();
+    const name = String(rawName).trim();
+    if (id && name && !unique.has(id)) unique.set(id, { id, name });
+  }
+  return [...unique.values()];
+};
+
+export const getForms = async () =>
+  normalizeForms(await request<unknown>("sat", routes.forms));
 export const getCountries = async () =>
   normalizeCountries(await request<unknown>("sat", routes.countries));
 export const getLocations = async (countryId: string) =>

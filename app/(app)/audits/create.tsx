@@ -1,18 +1,18 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { useState } from "react";
-import { Text } from "react-native";
-import { useForm } from "react-hook-form";
 import { queryClient } from "@/src/api/query-client";
 import { Button, ErrorState, Screen, TextField } from "@/src/components/ui";
 import {
-  auditKeys,
-  createAudit,
-  getCountries,
-  getLocations,
+    auditKeys,
+    createAudit,
+    getCountries,
+    getLocations,
 } from "@/src/features/audits/api";
 import { LookupSelector } from "@/src/features/audits/LookupSelector";
 import { useAuth } from "@/src/features/auth/session";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { router } from "expo-router";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { Text } from "react-native";
 
 export default function CreateAudit() {
   const { user } = useAuth();
@@ -87,7 +87,9 @@ export default function CreateAudit() {
         options={locations.data ?? []}
         selectedId={selectedLocationId}
         loading={locations.isLoading}
-        disabled={selectedCountryId === null || locations.isLoading}
+        disabled={
+          selectedCountryId === null || locations.isLoading || !!locations.error
+        }
         placeholder={
           selectedCountryId === null
             ? "Select a country first"
@@ -96,10 +98,7 @@ export default function CreateAudit() {
         onSelect={setSelectedLocationId}
       />
       {locations.error ? (
-        <ErrorState
-          message={locations.error.message}
-          retry={() => void locations.refetch()}
-        />
+        <ErrorState message={locations.error.message} retry={() => void locations.refetch()} />
       ) : null}
       <TextField
         label="Work area"

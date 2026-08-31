@@ -1,6 +1,6 @@
+import { TextField } from "@/src/components/ui";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
-import { TextField } from "@/src/components/ui";
 import type { AnswerValue, DynamicForm, Question } from "./model";
 
 function kind(q: Question) {
@@ -44,7 +44,7 @@ export function DynamicFormRenderer({
                 {q.required || q.is_required ? " *" : ""}
               </Text>
               <View className="flex-row flex-wrap gap-2">
-                {(q.options ?? []).map((o) => {
+                {(q.options ?? []).map((o, optionIndex) => {
                   const option = o.value ?? o.id;
                   const current = values[id];
                   const selected = Array.isArray(current)
@@ -52,7 +52,7 @@ export function DynamicFormRenderer({
                     : current === option;
                   return (
                     <Pressable
-                      key={String(o.id)}
+                      key={`${String(o.id)}-${optionIndex}`}
                       accessibilityRole="radio"
                       accessibilityState={{ selected }}
                       onPress={() => onChange(id, option)}
