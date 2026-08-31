@@ -3,6 +3,7 @@ import {
     createAudit,
     getAudits,
     getLocations,
+    getLocationsByCountry,
     normalizeCountries,
     normalizeForms,
     normalizeLocations,
@@ -82,17 +83,32 @@ describe("audit lookup contracts", () => {
     expect(mockedRequest).toHaveBeenCalledWith("sat", "/locations");
   });
 
+  test("filters locations to the selected country when a country id is provided", async () => {
+    mockedRequest.mockResolvedValueOnce([
+      { location_id: 1, location_name: "Perth", country_id: 7 },
+      { location_id: 2, location_name: "Sydney", country_id: 9 },
+      { location_id: 3, location_name: "Melbourne", country_id: 7 },
+    ]);
+
+    await expect(getLocationsByCountry(7)).resolves.toEqual([
+      { id: "1", name: "Perth" },
+      { id: "3", name: "Melbourne" },
+    ]);
+  });
+
   test("normalizes location names and nested data envelopes returned by the API", () => {
     expect(
       normalizeLocations({
         data: [
           { id: 1, location: "Perth" },
           { location_id: 2, location_name: "Sydney" },
+          { Location_id: 3, Location_name: "Melbourne" },
         ],
       }),
     ).toEqual([
       { id: "1", name: "Perth" },
       { id: "2", name: "Sydney" },
+      { id: "3", name: "Melbourne" },
     ]);
   });
 

@@ -1,10 +1,10 @@
 import { queryClient } from "@/src/api/query-client";
 import { Button, ErrorState, Screen, TextField } from "@/src/components/ui";
 import {
-    auditKeys,
-    createAudit,
-    getCountries,
-    getLocations,
+  auditKeys,
+  createAudit,
+  getCountries,
+  getLocationsByCountry,
 } from "@/src/features/audits/api";
 import { LookupSelector } from "@/src/features/audits/LookupSelector";
 import { useAuth } from "@/src/features/auth/session";
@@ -32,8 +32,13 @@ export default function CreateAudit() {
     queryFn: getCountries,
   });
   const locations = useQuery({
-    queryKey: auditKeys.locations,
-    queryFn: getLocations,
+    queryKey: [...auditKeys.locations, selectedCountryId],
+    queryFn: () =>
+      selectedCountryId === null
+        ? Promise.resolve([])
+        : getLocationsByCountry(selectedCountryId),
+    enabled: selectedCountryId !== null,
+    staleTime: 5 * 60 * 1000,
   });
   const mutation = useMutation({
     mutationFn: createAudit,
@@ -75,6 +80,10 @@ export default function CreateAudit() {
         disabled={countries.isLoading}
         placeholder="Select a country"
         onSelect={(id) => {
+          console.log("[debug] country selected", {
+            countryId: id,
+            selectedCountryId,
+          });
           if (id === selectedCountryId) return;
           setSelectedLocationId(null);
           setSelectedCountryId(id);

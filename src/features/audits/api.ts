@@ -111,27 +111,39 @@ function normalizeLookup(
   const unique = new Map<string, { id: string; name: string }>();
   for (const row of lookupRows(value)) {
     if (!isRecord(row)) continue;
-    const camelIdKey = idKey.replace(/_([a-z])/g, (_, letter: string) =>
-      letter.toUpperCase(),
-    );
-    const camelNameKey = nameKey.replace(/_([a-z])/g, (_, letter: string) =>
-      letter.toUpperCase(),
-    );
-    const rawId = row[idKey] ?? row[camelIdKey] ?? row.id;
-    const lookupNameKey = nameKey === "country_name" ? "country" : "location";
-    const rawName =
-      row[nameKey] ??
-      row[camelNameKey] ??
-      row.name ??
-      row.label ??
-      row[lookupNameKey];
+
+    const aliasesId = [
+      idKey,
+      idKey.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
+      idKey.replace(/_/g, ""),
+      idKey.replace(/^./, (letter) => letter.toUpperCase()).replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
+      "id",
+    ];
+
+    const aliasesName = [
+      nameKey,
+      nameKey.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
+      nameKey.replace(/_/g, ""),
+      nameKey.replace(/^./, (letter) => letter.toUpperCase()).replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase()),
+      nameKey === "country_name" ? "country" : "location",
+      nameKey === "country_name" ? "Country_name" : "Location_name",
+      "name",
+      "label",
+    ];
+
+    const rawId = aliasesId.find((key) => key in row && row[key] !== undefined);
+    const rawName = aliasesName.find((key) => key in row && row[key] !== undefined);
+    const idValue = rawId ? row[rawId] : undefined;
+    const nameValue = rawName ? row[rawName] : undefined;
+
     if (
-      (typeof rawId !== "string" && typeof rawId !== "number") ||
-      (typeof rawName !== "string" && typeof rawName !== "number")
+      (typeof idValue !== "string" && typeof idValue !== "number") ||
+      (typeof nameValue !== "string" && typeof nameValue !== "number")
     )
       continue;
-    const id = String(rawId).trim();
-    const name = String(rawName).trim();
+
+    const id = String(idValue).trim();
+    const name = String(nameValue).trim();
     if (!id || !name || unique.has(id)) continue;
     unique.set(id, { id, name });
   }
@@ -220,3 +232,34 @@ export const getCountries = async () =>
   normalizeCountries(await request<unknown>("sat", routes.countries));
 export const getLocations = async () =>
   normalizeLocations(await request<unknown>("sat", routes.locations));
+export const getLocationsByCountry = async (countryId: string | number) => {
+  const raw = await request<unknown>("sat", routes.locations);
+  const rows = Array.isArray(raw) ? raw : lookupRows(raw);
+  const filtered = rows.filter((row) => {
+    if (!isRecord(row)) return false;
+    const candidates = [
+      row.country_id,
+      row.countryId,
+      row.country,
+      row.country_name,
+      row.countryName,
+      row.location_country_id,
+      row.locationCountryId,
+      row.location_country_name,
+      row.locationCountryName,
+    ];
+    return candidates.some(
+      (value) => value !== undefined && String(value).trim() === String(countryId).trim(),
+    );
+  });
+
+  const result = filtered.length ? filtered : rows;
+  console.log("[debug] locations for country", {
+    countryId,
+    raw,
+    filteredRows: filtered,
+    result,
+  });
+
+  return normalizeLocations(result);
+};
