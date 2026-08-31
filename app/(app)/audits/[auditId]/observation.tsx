@@ -8,19 +8,19 @@ import {
 } from "@/src/components/ui";
 import { getForms, getOpeningPairs } from "@/src/features/audits/api";
 import { useAuth } from "@/src/features/auth/session";
+import { ImageAnnotationEditor } from "@/src/features/observations/annotation/ImageAnnotationEditor";
 import {
     getDynamicForm,
-    submitObservation,
+    submitObservation
 } from "@/src/features/observations/api";
 import {
-    ObservationAttachmentAdapter,
-    validateAttachment,
+    validateAttachment
 } from "@/src/features/observations/attachments";
 import { DynamicFormRenderer } from "@/src/features/observations/DynamicFormRenderer";
-import { ImageAnnotationEditor } from "@/src/features/observations/annotation/ImageAnnotationEditor";
 import type {
     AnswerValue,
     Attachment,
+    SubmissionPayload,
 } from "@/src/features/observations/model";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
@@ -57,7 +57,13 @@ export default function Observation() {
     enabled: !!formId,
   });
   const mutation = useMutation({
-    mutationFn: submitObservation,
+    mutationFn: ({
+      payload,
+      attachments,
+    }: {
+      payload: SubmissionPayload;
+      attachments: Attachment[];
+    }) => submitObservation(payload, attachments),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["audits", auditId] });
       router.back();
@@ -127,19 +133,20 @@ export default function Observation() {
         next[String(q.id)] = "This field is required.";
     if (mode === "closing" && !openingId)
       next.opening = "Select the opening observation being closed.";
-    if (files.length && !ObservationAttachmentAdapter.canSubmit)
-      setFileError(ObservationAttachmentAdapter.explanation);
     setErrors(next);
-    if (Object.keys(next).length || files.length) return;
+    if (Object.keys(next).length) return;
     mutation.mutate({
-      audit_id: auditId,
-      submitter_id: user.id,
-      form_id: form.data.id,
-      sat_answers: questions.map((q) => ({
-        question_id: q.id,
-        answer: values[String(q.id)] ?? null,
-      })),
-      ...(mode === "closing" ? { opening_sub_id: openingId } : {}),
+      payload: {
+        audit_id: auditId,
+        submitter_id: user.id,
+        form_id: form.data.id,
+        sat_answers: questions.map((q) => ({
+          question_id: q.id,
+          answer: values[String(q.id)] ?? null,
+        })),
+        ...(mode === "closing" ? { opening_sub_id: openingId } : {}),
+      },
+      attachments: files,
     });
   }
   return (

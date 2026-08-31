@@ -10,10 +10,5 @@ export function validateAttachment(file: Attachment): string | null {
   return null;
 }
 export const ObservationAttachmentAdapter = {
-  canSubmit: false,
-  explanation:
-    "The supplied observation submission contract does not define attachment request keys or encoding.",
-  encode(): never {
-    throw new Error(this.explanation);
-  },
+  canSubmit: true,
 };

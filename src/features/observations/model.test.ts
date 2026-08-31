@@ -1,6 +1,5 @@
 import {
-  ObservationAttachmentAdapter,
-  validateAttachment,
+    validateAttachment,
 } from "./attachments";
 import { buildSubmission, calculateRpn, toggleMultiSelect } from "./model";
 
@@ -25,7 +24,7 @@ describe("observation contract helpers", () => {
     });
     expect(buildSubmission(base)).not.toHaveProperty("submission_type_id");
   });
-  test("validates attachment type and size and isolates missing transport", () => {
+  test("validates attachment type and size", () => {
     expect(
       validateAttachment({
         uri: "file://a",
@@ -41,7 +40,6 @@ describe("observation contract helpers", () => {
         size: 11 * 1024 * 1024,
       }),
     ).toMatch(/10 MB/);
-    expect(ObservationAttachmentAdapter.canSubmit).toBe(false);
   });
   test("toggles multi-select without duplicates in option order", () => {
     expect(toggleMultiSelect(["head"], "eye", ["body", "head", "eye"])).toEqual(["head", "eye"]);

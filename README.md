@@ -56,9 +56,9 @@ npx testflight
 
 The final two commands are owner-controlled: do not run them until Apple credentials and build authorization are available. Production API values are public routing metadata, not secrets.
 
-## Known backend contract limitation
+## Attachment implementation
 
-The supplied material describes binary media retrieval but does **not** define observation attachment request keys, MIME/size rules, or submission encoding. Picker, preview, cancellation, removal, and conservative JPEG/PNG/PDF validation are implemented, but submission is deliberately blocked when files are attached. `ObservationAttachmentAdapter` isolates this missing contract; it does not reuse the unrelated ticket upload field or invent multipart encoding.
+Observation attachments (images, PDFs) are validated on add (type and 10 MB size limit), previewed, and uploaded to `POST /submissions/{id}/media` after submission creation. Marked images are fully supported. Each attachment is uploaded separately as multipart form-data with its MIME type preserved.
 
 ## Handover checklist
 

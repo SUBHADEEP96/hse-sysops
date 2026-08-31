@@ -89,3 +89,44 @@ export async function requestBinary(path: string): Promise<Blob> {
     );
   return response.blob();
 }
+
+export async function requestMultipart<T>(
+  path: string,
+  formData: FormData,
+  options: Omit<Options, "body"> = {},
+): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    options.timeoutMs ?? 15000,
+  );
+  const headers = new Headers(options.headers);
+  if (sessionToken) headers.set("Authorization", `Bearer ${sessionToken}`);
+  try {
+    const response = await fetch(`${env.origin}${env.satPrefix}${path}`, {
+      ...options,
+      method: "POST",
+      headers,
+      signal: options.signal ?? controller.signal,
+      body: formData,
+    });
+    const text = await response.text();
+    const body: unknown = text ? JSON.parse(text) : undefined;
+    if (!response.ok) {
+      if (response.status === 401 && options.authenticated !== false)
+        await unauthorizedHandler?.();
+      throw normalizeApiError(response.status, body);
+    }
+    return unwrap<T>(body);
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error instanceof Error && error.name === "AbortError")
+      throw new ApiError(408, "The request timed out. Please try again.");
+    throw new ApiError(
+      0,
+      "Unable to connect. Check your network and try again.",
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}

@@ -15,8 +15,14 @@ export function ImageAnnotationEditor({ visible, imageUri, onCancel, onSave }: {
   const pan = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: (event) => setActive({ id: `${Date.now()}`, points: [normalizePoint(event.nativeEvent.locationX, event.nativeEvent.locationY, size.width, size.height)] }),
-    onPanResponderMove: (event) => setActive((stroke) => stroke ? { ...stroke, points: [...stroke.points, normalizePoint(event.nativeEvent.locationX, event.nativeEvent.locationY, size.width, size.height)] } : stroke),
+    onPanResponderGrant: (event) => {
+      const { locationX, locationY } = event.nativeEvent;
+      setActive({ id: `${Date.now()}`, points: [normalizePoint(locationX, locationY, size.width, size.height)] });
+    },
+    onPanResponderMove: (event) => {
+      const { locationX, locationY } = event.nativeEvent;
+      setActive((stroke) => stroke ? { ...stroke, points: [...stroke.points, normalizePoint(locationX, locationY, size.width, size.height)] } : stroke);
+    },
     onPanResponderRelease: () => setActive((stroke) => { if (stroke) setStrokes((current) => addStroke(current, stroke)); return null; }),
   }), [size.height, size.width]);
   async function save() {
