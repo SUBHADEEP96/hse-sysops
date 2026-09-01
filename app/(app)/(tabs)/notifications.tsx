@@ -1,21 +1,21 @@
+import { queryClient } from "@/src/api/query-client";
+import {
+    Button,
+    Card,
+    EmptyState,
+    ErrorState,
+    LoadingState,
+    Screen,
+} from "@/src/components/ui";
+import {
+    getNotifications,
+    markAllRead,
+    markRead,
+    notificationKeys,
+} from "@/src/features/notifications/api";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Pressable, Text } from "react-native";
-import {
-  Button,
-  Card,
-  EmptyState,
-  ErrorState,
-  LoadingState,
-  Screen,
-} from "@/src/components/ui";
-import { queryClient } from "@/src/api/query-client";
-import {
-  getNotifications,
-  markAllRead,
-  markRead,
-  notificationKeys,
-} from "@/src/features/notifications/api";
 export default function Notifications() {
   const q = useQuery({
     queryKey: notificationKeys.all,
@@ -49,9 +49,9 @@ export default function Notifications() {
           message="Audit updates will appear here."
         />
       ) : (
-        q.data.map((n) => (
+        q.data.map((n, index) => (
           <Pressable
-            key={String(n.id)}
+            key={`${n.id}-${index}`}
             onPress={() => {
               if (!n.is_read) one.mutate(n.id);
               if (n.audit_id)

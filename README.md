@@ -56,15 +56,16 @@ npx testflight
 
 The final two commands are owner-controlled: do not run them until Apple credentials and build authorization are available. Production API values are public routing metadata, not secrets.
 
-## Attachment implementation
+## Known backend contract limitation
 
-Observation attachments (images, PDFs) are validated on add (type and 10 MB size limit), previewed, and uploaded to `POST /submissions/{id}/media` after submission creation. Marked images are fully supported. Each attachment is uploaded separately as multipart form-data with its MIME type preserved.
+The SAT API documentation (sat_API_LIST.md §3 Submissions) lists 6 submission endpoints but does **not** include `POST /submissions/:id/media` for uploading observation attachments. Picker, preview, cancellation, removal, and conservative JPEG/PNG/PDF validation are fully implemented. Submission is blocked when files are attached pending backend contract definition. `ObservationAttachmentAdapter` isolates this missing contract.
 
 ## Handover checklist
 
 1. Run all verification commands above on the handover commit.
 2. Confirm API origin/prefixes for each EAS environment.
 3. Confirm the iOS bundle identifier and EAS project ownership.
-4. Obtain the observation attachment contract from the SAT backend owner and implement only the documented adapter encoding.
-5. Perform authenticated device acceptance tests with non-production credentials supplied out of band.
-6. Have the Apple account owner initiate the production build and TestFlight upload.
+4. **Obtain the observation attachment upload endpoint definition from the SAT backend owner** — confirm request method, path, field names, multipart encoding, and response format.
+5. Implement `uploadAttachment()` and update `submitObservation()` with the documented endpoint.
+6. Perform authenticated device acceptance tests with non-production credentials supplied out of band.
+7. Have the Apple account owner initiate the production build and TestFlight upload.

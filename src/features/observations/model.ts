@@ -36,11 +36,17 @@ export type DynamicForm = {
   sections?: { id: string | number; name?: string; questions?: Question[] }[];
   questions?: Question[];
 };
+export type SatAnswer = {
+  question_id: string | number;
+  answer_value?: string | number | boolean | (string | number)[] | null;
+  is_media?: boolean;
+  media?: string[];
+};
 export type SubmissionPayload = {
   audit_id: string | number;
   submitter_id: string | number;
   form_id: string | number;
-  sat_answers: { question_id: string | number; answer: AnswerValue }[];
+  sat_answers: SatAnswer[];
   opening_sub_id?: string | number;
 };
 export function buildSubmission(payload: SubmissionPayload): SubmissionPayload {

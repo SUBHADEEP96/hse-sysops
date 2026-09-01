@@ -1,6 +1,6 @@
-import { request, requestMultipart } from "@/src/api/http-client";
+import { request } from "@/src/api/http-client";
 import { routes } from "@/src/api/routes";
-import type { Attachment, DynamicForm, Question, SubmissionPayload } from "./model";
+import type { DynamicForm, Question, SubmissionPayload } from "./model";
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 const text = (value: unknown) =>
@@ -90,55 +90,9 @@ export const getDynamicForm = (id: string) =>
     `${routes.dynamicForm}/${encodeURIComponent(id)}`,
   ).then((value) => normalizeDynamicForm(value) ?? { id });
 
-export async function uploadAttachment(
-  submissionId: string | number,
-  attachment: Attachment,
-  index: number = 0,
-): Promise<void> {
-  const formData = new FormData();
-  formData.append("index", String(index));
+export const submitObservation = (payload: SubmissionPayload) =>
+  request("sat", routes.submissions, { method: "POST", body: payload });
 
-  // Read file from URI and append as Blob
-  const base64 = await FileSystem.readAsStringAsync(attachment.uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  const blob = new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))], {
-    type: attachment.mimeType || "application/octet-stream",
-  });
-  formData.append("file", blob, attachment.name);
-
-  await requestMultipart<void>(
-    `${routes.submissions}/${encodeURIComponent(submissionId)}/media`,
-    formData,
-  );
-}
-
-export type SubmissionResult = {
-  id?: string | number;
-  submission_id?: string | number;
-  [key: string]: unknown;
-};
-
-export async function submitObservation(
-  payload: SubmissionPayload,
-  attachments: Attachment[] = [],
-): Promise<SubmissionResult> {
-  const result = await request<SubmissionResult>("sat", routes.submissions, {
-    method: "POST",
-    body: payload,
-  });
-  const submissionId = result.id ?? result.submission_id;
-
-  if (submissionId && attachments.length > 0) {
-    await Promise.all(
-      attachments.map((attachment, index) =>
-        uploadAttachment(submissionId, attachment, index),
-      ),
-    );
-  }
-
-  return result;
-}
 export const getLikelihood = () =>
   request<{ likelihood_of_harm: string; value: number }[]>(
     "sat",

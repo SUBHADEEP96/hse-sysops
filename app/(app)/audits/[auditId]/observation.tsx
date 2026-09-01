@@ -14,7 +14,8 @@ import {
     submitObservation
 } from "@/src/features/observations/api";
 import {
-    validateAttachment
+    ObservationAttachmentAdapter,
+    validateAttachment,
 } from "@/src/features/observations/attachments";
 import { DynamicFormRenderer } from "@/src/features/observations/DynamicFormRenderer";
 import type {
@@ -57,13 +58,7 @@ export default function Observation() {
     enabled: !!formId,
   });
   const mutation = useMutation({
-    mutationFn: ({
-      payload,
-      attachments,
-    }: {
-      payload: SubmissionPayload;
-      attachments: Attachment[];
-    }) => submitObservation(payload, attachments),
+    mutationFn: (payload: SubmissionPayload) => submitObservation(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["audits", auditId] });
       router.back();
@@ -118,7 +113,7 @@ export default function Observation() {
     setFileError(e ?? "");
     if (!e) setFiles((v) => [...v, a]);
   }
-  function submit() {
+  async function submit() {
     if (!form.data || !user) return;
     const next: Record<string, string> = {};
     const questions =
@@ -135,19 +130,57 @@ export default function Observation() {
       next.opening = "Select the opening observation being closed.";
     setErrors(next);
     if (Object.keys(next).length) return;
-    mutation.mutate({
-      payload: {
+
+    try {
+      // Encode media attachments if present
+      let encodedMedia: string[] = [];
+      if (files.length > 0) {
+        encodedMedia = await ObservationAttachmentAdapter.encode(files);
+      }
+
+      // Find a media/attachment question, or use the first question if no media question
+      let mediaQuestionId: string | number | null = null;
+      if (encodedMedia.length > 0) {
+        const mediaQuestion = questions.find((q) => {
+          const type = String(q.question_type || q.type || "").toLowerCase();
+          return type.includes("media") || type.includes("attachment") || type.includes("file");
+        });
+        mediaQuestionId = mediaQuestion?.id ?? questions[0]?.id ?? null;
+      }
+
+      // Build sat_answers
+      const satAnswers = questions.map((q) => {
+        const questionId = q.id;
+        const answer_value = values[String(questionId)] ?? null;
+        
+        // Filter out Attachment[] values - they're handled separately via media encoding
+        if (Array.isArray(answer_value) && answer_value.length > 0 && typeof answer_value[0] === "object" && "uri" in answer_value[0]) {
+          return null;
+        }
+
+        const baseAnswer = {
+          question_id: questionId,
+          answer_value,
+        };
+
+        // Add media if this is the media question
+        if (encodedMedia.length > 0 && mediaQuestionId === questionId) {
+          return { ...baseAnswer, is_media: true, media: encodedMedia };
+        }
+
+        return baseAnswer;
+      }).filter((item): item is NonNullable<typeof item> => item !== null);
+
+      mutation.mutate({
         audit_id: auditId,
         submitter_id: user.id,
         form_id: form.data.id,
-        sat_answers: questions.map((q) => ({
-          question_id: q.id,
-          answer: values[String(q.id)] ?? null,
-        })),
+        sat_answers: satAnswers,
         ...(mode === "closing" ? { opening_sub_id: openingId } : {}),
-      },
-      attachments: files,
-    });
+      });
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : "Failed to encode media");
+    }
   }
   return (
     <Screen>

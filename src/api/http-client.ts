@@ -101,20 +101,23 @@ export async function requestMultipart<T>(
     options.timeoutMs ?? 15000,
   );
   const headers = new Headers(options.headers);
-  if (sessionToken) headers.set("Authorization", `Bearer ${sessionToken}`);
+  if (sessionToken)
+    headers.set("Authorization", `Bearer ${sessionToken}`);
   try {
-    const response = await fetch(`${env.origin}${env.satPrefix}${path}`, {
-      ...options,
-      method: "POST",
-      headers,
-      signal: options.signal ?? controller.signal,
-      body: formData,
-    });
+    const response = await fetch(
+      `${env.origin}${env.satPrefix}${path}`,
+      {
+        method: "POST",
+        ...options,
+        headers,
+        signal: options.signal ?? controller.signal,
+        body: formData,
+      },
+    );
     const text = await response.text();
     const body: unknown = text ? JSON.parse(text) : undefined;
     if (!response.ok) {
-      if (response.status === 401 && options.authenticated !== false)
-        await unauthorizedHandler?.();
+      if (response.status === 401) await unauthorizedHandler?.();
       throw normalizeApiError(response.status, body);
     }
     return unwrap<T>(body);
