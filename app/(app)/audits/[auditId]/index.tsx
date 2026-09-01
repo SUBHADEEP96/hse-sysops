@@ -14,6 +14,7 @@ import {
     getAuditSubmissions,
     updateAuditStatus,
 } from "@/src/features/audits/api";
+import { formatAuditDateTime } from "@/src/features/audits/date";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ObservationList } from "@/src/features/observations/ObservationList";
 import { normalizeSavedObservations } from "@/src/features/observations/model";
@@ -86,6 +87,16 @@ export default function AuditDetail() {
         <Text className="my-3 text-slate-600">
           {typeof a.location === "object" ? a.location.name : a.location}
         </Text>
+        {a.observed_at ? (
+          <Text className="mb-2 text-slate-600">
+            Observed: {formatAuditDateTime(a.observed_at)}
+          </Text>
+        ) : null}
+        {a.created_at ? (
+          <Text className="mb-3 text-slate-500">
+            Created: {formatAuditDateTime(a.created_at)}
+          </Text>
+        ) : null}
         <StatusBadge status={a.status_id ?? a.status ?? "Unknown"} />
       </Card>
       <Text className="mb-2 mt-4 text-lg font-bold text-ink">Audit contents</Text>

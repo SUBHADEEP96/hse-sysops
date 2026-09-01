@@ -1,3 +1,5 @@
+import { formatAuditDateTime } from "@/src/features/audits/date";
+
 export type AnswerValue =
   | string
   | number
@@ -108,14 +110,19 @@ const first = (row: UnknownRecord, keys: string[]) => {
   return undefined;
 };
 
-const semanticFields: [string, string[]][] = [
+const formatObservationValue = (label: string, value: string) =>
+  /date|time/i.test(label) || /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)
+    ? formatAuditDateTime(value)
+    : value;
+
+const semanticFields: [string, string[], "date"?][] = [
   ["Description", ["description", "observation_description"]],
   ["Category", ["category", "category_name"]],
   ["Remarks", ["remarks", "remark", "comments"]],
   ["Recommended action", ["recommended_action", "corrective_action", "recommendation"]],
   ["Responsible person", ["responsible_person", "assignee", "assigned_to", "responsible_person_name"]],
-  ["Created date", ["created_at", "created_date"]],
-  ["Target date", ["target_date", "due_date"]],
+  ["Created date", ["created_at", "created_date"], "date"],
+  ["Target date", ["target_date", "due_date"], "date"],
   ["Location", ["location", "location_name"]],
 ];
 
@@ -133,9 +140,13 @@ export function normalizeSavedObservations(value: unknown): SavedObservation[] {
   return items.flatMap((item) => {
     if (!isRecord(item)) return [];
     const details: ObservationDetail[] = [];
-    for (const [label, keys] of semanticFields) {
+    for (const [label, keys, type] of semanticFields) {
       const value = first(item, keys);
-      if (value) details.push({ label, value });
+      if (value)
+        details.push({
+          label,
+          value: type === "date" ? formatAuditDateTime(value) : value,
+        });
     }
 
     const answers = Array.isArray(item.sat_answers)
@@ -156,7 +167,7 @@ export function normalizeSavedObservations(value: unknown): SavedObservation[] {
         "question",
       ]);
       if (label && valueText && imageValues(rawValue).length === 0)
-        details.push({ label, value: valueText });
+        details.push({ label, value: formatObservationValue(label, valueText) });
     }
 
     const id = first(item, ["id", "submission_id"]);
