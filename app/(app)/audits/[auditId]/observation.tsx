@@ -17,7 +17,7 @@ import {
     ObservationAttachmentAdapter,
     validateAttachment,
 } from "@/src/features/observations/attachments";
-import { DynamicFormRenderer } from "@/src/features/observations/DynamicFormRenderer";
+import { DynamicFormRenderer, questionKind } from "@/src/features/observations/DynamicFormRenderer";
 import type {
     AnswerValue,
     Attachment,
@@ -29,20 +29,22 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Image, Modal, Pressable, Text, View } from "react-native";
+import { Alert, Image, Modal, Pressable, Text, View } from "react-native";
 export default function Observation() {
-  const { auditId, mode } = useLocalSearchParams<{
+  const { auditId, mode, openingSubId, formId: initialFormId } = useLocalSearchParams<{
     auditId: string;
     mode?: string;
+    openingSubId?: string;
+    formId?: string;
   }>();
   const { user } = useAuth();
-  const [formId, setFormId] = useState("");
-  const [openingId, setOpeningId] = useState("");
+  const [formId, setFormId] = useState(initialFormId ?? "");
+  const [openingId, setOpeningId] = useState(openingSubId ?? "");
   const [values, setValues] = useState<Record<string, AnswerValue>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [files, setFiles] = useState<Attachment[]>([]);
+  const [filesByQuestion, setFilesByQuestion] = useState<Record<string, Attachment[]>>({});
   const [fileError, setFileError] = useState("");
-  const [annotating, setAnnotating] = useState<number | null>(null);
+  const [annotating, setAnnotating] = useState<{ questionId: string; index: number } | null>(null);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const forms = useQuery({
     queryKey: ["forms", "selection"],
@@ -60,9 +62,14 @@ export default function Observation() {
   });
   const mutation = useMutation({
     mutationFn: (payload: SubmissionPayload) => submitObservation(payload),
-    onSuccess: async () => {
+    onSuccess: async (response) => {
       await queryClient.invalidateQueries({ queryKey: ["audits", auditId] });
-      router.back();
+      const record = typeof response === "object" && response !== null ? response as Record<string, unknown> : {};
+      const data = typeof record.data === "object" && record.data !== null ? record.data as Record<string, unknown> : {};
+      const submissionId = data.submission_id ?? record.submission_id;
+      Alert.alert("Observation submitted", submissionId == null ? "The observation was saved." : `Submission ${String(submissionId)} was saved.`, [
+        { text: "OK", onPress: () => router.back() },
+      ]);
     },
   });
   if (forms.isLoading) return <LoadingState />;
@@ -75,7 +82,7 @@ export default function Observation() {
         />
       </Screen>
     );
-  async function image(camera = false) {
+  async function image(questionId: string, camera = false) {
     const permission = camera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -92,7 +99,7 @@ export default function Observation() {
         });
     if (!result.canceled) {
       const a = result.assets[0];
-      add({
+      add(questionId, {
         uri: a.uri,
         name: a.fileName ?? "image.jpg",
         mimeType: a.mimeType,
@@ -100,19 +107,19 @@ export default function Observation() {
       });
     }
   }
-  async function document() {
+  async function document(questionId: string) {
     const result = await DocumentPicker.getDocumentAsync({
       type: ["image/jpeg", "image/png", "application/pdf"],
     });
     if (!result.canceled) {
       const a = result.assets[0];
-      add({ uri: a.uri, name: a.name, mimeType: a.mimeType, size: a.size });
+      add(questionId, { uri: a.uri, name: a.name, mimeType: a.mimeType, size: a.size });
     }
   }
-  function add(a: Attachment) {
+  function add(questionId: string, a: Attachment) {
     const e = validateAttachment(a);
     setFileError(e ?? "");
-    if (!e) setFiles((v) => [...v, a]);
+    if (!e) setFilesByQuestion((current) => ({ ...current, [questionId]: [...(current[questionId] ?? []), a] }));
   }
   async function submit() {
     if (!form.data || !user) return;
@@ -121,59 +128,45 @@ export default function Observation() {
       form.data.sections?.flatMap((s) => s.questions ?? []) ??
       form.data.questions ??
       [];
-    for (const q of questions)
+    for (const q of questions) {
+      const value = values[String(q.id)];
       if (
         (q.required || q.is_required) &&
-        (values[String(q.id)] == null || values[String(q.id)] === "")
+        (questionKind(q).match(/media|image|attachment|file/)
+          ? !(filesByQuestion[String(q.id)]?.length)
+          : value == null || value === "" || (Array.isArray(value) && value.length === 0))
       )
         next[String(q.id)] = "This field is required.";
+    }
     if (mode === "closing" && !openingId)
       next.opening = "Select the opening observation being closed.";
     setErrors(next);
     if (Object.keys(next).length) return;
 
     try {
-      // Encode media attachments if present
-      let encodedMedia: string[] = [];
-      if (files.length > 0) {
-        encodedMedia = await ObservationAttachmentAdapter.encode(files);
-      }
-
-      // Find a media/attachment question, or use the first question if no media question
-      let mediaQuestionId: string | number | null = null;
-      if (encodedMedia.length > 0) {
-        const mediaQuestion = questions.find((q) => {
-          const type = String(q.question_type || q.type || "").toLowerCase();
-          return type.includes("media") || type.includes("attachment") || type.includes("file");
-        });
-        mediaQuestionId = mediaQuestion?.id ?? questions[0]?.id ?? null;
-      }
-
-      // Build sat_answers
-      const satAnswers: SatAnswer[] = questions.map((q) => {
-        const questionId = q.id;
-        const answer_value = values[String(questionId)] ?? null;
-        
-        // Filter out Attachment[] values - they're handled separately via media encoding
-        const savedAnswer = Array.isArray(answer_value)
-          ? answer_value.filter(
-              (value): value is string | number =>
-                typeof value === "string" || typeof value === "number",
-            )
-          : answer_value;
-
-        const baseAnswer = {
-          question_id: questionId,
-          answer_value: savedAnswer,
-        };
-
-        // Add media if this is the media question
-        if (encodedMedia.length > 0 && mediaQuestionId === questionId) {
-          return { ...baseAnswer, is_media: true, media: encodedMedia };
+      const satAnswers: SatAnswer[] = [];
+      for (const q of questions) {
+        const questionId = String(q.id);
+        const attachments = filesByQuestion[questionId] ?? [];
+        const type = questionKind(q);
+        const isMedia = type.includes("media") || type.includes("image") || type.includes("attachment") || type.includes("file");
+        if (isMedia) {
+          satAnswers.push({
+            question_id: q.id,
+            is_media: true,
+            answer_value: null,
+            media: await ObservationAttachmentAdapter.encode(attachments),
+          });
+          continue;
         }
-
-        return baseAnswer;
-      });
+        const answer = values[questionId] ?? null;
+        satAnswers.push({
+          question_id: q.id,
+          answer_value: Array.isArray(answer)
+            ? answer.filter((item): item is string | number => typeof item === "string" || typeof item === "number")
+            : answer,
+        });
+      }
 
       mutation.mutate({
         audit_id: auditId,
@@ -239,44 +232,39 @@ export default function Observation() {
             errors={errors}
             onChange={(id, value) => setValues((v) => ({ ...v, [id]: value }))}
           />
-          <Card>
-            <Text className="mb-2 font-bold text-ink">Attachments</Text>
-            <Text className="mb-3 text-sm text-slate-600">Add photographic evidence or a supporting document.</Text>
-            <View className="gap-2">
-              <Button
-                title="Take photo"
-                variant="secondary"
-                onPress={() => void image(true)}
-              />
-              <Button
-                title="Choose image"
-                variant="secondary"
-                onPress={() => void image()}
-              />
-              <Button
-                title="Choose document"
-                variant="secondary"
-                onPress={() => void document()}
-              />
-            </View>
-            {files.map((f, i) => (
-              <View key={`${f.uri}-${i}`} className="mt-3 rounded-xl border border-slate-200 p-3">
-                {f.mimeType?.startsWith("image/") ? (
-                  <Pressable accessibilityRole="button" accessibilityLabel={`Preview ${f.name}`} onPress={() => setPreviewUri(f.uri)}>
-                    <Image source={{ uri: f.uri }} resizeMode="cover" className="h-40 w-full rounded-lg" />
-                  </Pressable>
-                ) : null}
-                <Text className="mt-2 font-medium text-ink">{f.name}{f.annotated ? " · Marked" : ""}</Text>
-                <View className="mt-2 flex-row gap-2">
-                  {f.mimeType?.startsWith("image/") ? <Button title={f.annotated ? "Edit marking" : "Mark image"} variant="secondary" accessibilityLabel="Mark image" onPress={() => setAnnotating(i)} /> : null}
-                  <Button title="Remove" variant="danger" accessibilityLabel="Remove attachment" onPress={() => setFiles((v) => v.filter((_, x) => x !== i))} />
+          {(
+            form.data.sections?.flatMap((section) => section.questions ?? []) ?? form.data.questions ?? []
+          ).filter((question) => /media|image|attachment|file/.test(questionKind(question))).map((question) => {
+            const questionId = String(question.id);
+            const questionFiles = filesByQuestion[questionId] ?? [];
+            return (
+              <Card key={questionId}>
+                <Text className="mb-2 font-bold text-ink">{question.label ?? question.question ?? "Images"}{question.required || question.is_required ? " *" : ""}</Text>
+                <Text className="mb-3 text-sm text-slate-600">Add and mark photographic evidence in occurrence order.</Text>
+                <View className="gap-2">
+                  <Button title="Take photo" variant="secondary" onPress={() => void image(questionId, true)} />
+                  <Button title="Choose image" variant="secondary" onPress={() => void image(questionId)} />
+                  <Button title="Choose document" variant="secondary" onPress={() => void document(questionId)} />
                 </View>
-              </View>
-            ))}
-            {fileError ? (
-              <Text className="mt-2 text-red-700">{fileError}</Text>
-            ) : null}
-          </Card>
+                {questionFiles.map((file, index) => (
+                  <View key={`${file.uri}-${index}`} className="mt-3 rounded-xl border border-slate-200 p-3">
+                    {file.mimeType?.startsWith("image/") ? (
+                      <Pressable accessibilityRole="button" accessibilityLabel={`Preview ${file.name}`} onPress={() => setPreviewUri(file.uri)}>
+                        <Image source={{ uri: file.uri }} resizeMode="cover" className="h-40 w-full rounded-lg" />
+                      </Pressable>
+                    ) : null}
+                    <Text className="mt-2 font-medium text-ink">{file.name}{file.annotated ? " · Marked" : ""}</Text>
+                    <View className="mt-2 flex-row gap-2">
+                      {file.mimeType?.startsWith("image/") ? <Button title={file.annotated ? "Edit marking" : "Mark image"} variant="secondary" accessibilityLabel="Mark image" onPress={() => setAnnotating({ questionId, index })} /> : null}
+                      <Button title="Remove" variant="danger" accessibilityLabel="Remove attachment" onPress={() => setFilesByQuestion((current) => ({ ...current, [questionId]: (current[questionId] ?? []).filter((_, itemIndex) => itemIndex !== index) }))} />
+                    </View>
+                  </View>
+                ))}
+                {errors[questionId] ? <Text className="mt-2 text-red-700">{errors[questionId]}</Text> : null}
+                {fileError ? <Text className="mt-2 text-red-700">{fileError}</Text> : null}
+              </Card>
+            );
+          })}
           {mutation.error ? (
             <Text className="mb-3 text-red-700">{mutation.error.message}</Text>
           ) : null}
@@ -285,13 +273,13 @@ export default function Observation() {
             disabled={mutation.isPending}
             onPress={submit}
           />
-          {annotating !== null && files[annotating] ? (
+          {annotating !== null && filesByQuestion[annotating.questionId]?.[annotating.index] ? (
             <ImageAnnotationEditor
               visible
-              imageUri={files[annotating].originalUri ?? files[annotating].uri}
+              imageUri={filesByQuestion[annotating.questionId][annotating.index].originalUri ?? filesByQuestion[annotating.questionId][annotating.index].uri}
               onCancel={() => setAnnotating(null)}
               onSave={(uri) => {
-                setFiles((current) => current.map((file, index) => index === annotating ? { ...file, uri, originalUri: file.originalUri ?? file.uri, annotated: true, name: `marked-${file.name.replace(/^marked-/, "")}` } : file));
+                setFilesByQuestion((current) => ({ ...current, [annotating.questionId]: (current[annotating.questionId] ?? []).map((file, index) => index === annotating.index ? { ...file, uri, originalUri: file.originalUri ?? file.uri, annotated: true, name: `marked-${file.name.replace(/^marked-/, "")}` } : file) }));
                 setAnnotating(null);
               }}
             />

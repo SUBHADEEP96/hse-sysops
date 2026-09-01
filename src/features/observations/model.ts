@@ -30,6 +30,8 @@ export type Question = {
     value?: string | number;
   }[];
   metadata?: { role?: "likelihood" | "severity" | "rpn" };
+  allow_multiple?: boolean;
+  multiple?: boolean;
 };
 export type DynamicForm = {
   id: string | number;
@@ -59,11 +61,17 @@ export type ObservationDetail = {
 
 export type SavedObservation = {
   id?: string;
+  submissionId?: string;
+  closingSubmissionId?: string;
   title?: string;
   status?: string;
   severity?: string;
+  createdAt?: string;
+  submitter?: string;
   details: ObservationDetail[];
+  closingDetails?: ObservationDetail[];
   images: string[];
+  closingImages?: string[];
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -127,7 +135,10 @@ const semanticFields: [string, string[], "date"?][] = [
 ];
 
 /** Normalizes only values present in the submission-list response. */
-export function normalizeSavedObservations(value: unknown): SavedObservation[] {
+export function normalizeSavedObservations(
+  value: unknown,
+  questionsById: ReadonlyMap<string, Question> = new Map(),
+): SavedObservation[] {
   const source = isRecord(value) && isRecord(value.data) ? value.data : value;
   const items = Array.isArray(source)
     ? source
@@ -137,7 +148,7 @@ export function normalizeSavedObservations(value: unknown): SavedObservation[] {
         )
       : [];
 
-  return items.flatMap((item) => {
+  const submissions = items.flatMap((item) => {
     if (!isRecord(item)) return [];
     const details: ObservationDetail[] = [];
     for (const [label, keys, type] of semanticFields) {
@@ -160,25 +171,77 @@ export function normalizeSavedObservations(value: unknown): SavedObservation[] {
       images.push(...imageValues(answer.media ?? answer.images ?? answer.attachments));
       const rawValue = answer.answer_value ?? answer.answer ?? answer.value;
       const valueText = displayText(rawValue);
+      const questionId = displayText(answer.question_id ?? answer.questionId);
+      const definition = questionId ? questionsById.get(questionId) : undefined;
       const label = first(answer, [
         "question_label",
         "question_text",
         "label",
         "question",
-      ]);
+      ]) ?? definition?.label ?? definition?.question;
       if (label && valueText && imageValues(rawValue).length === 0)
         details.push({ label, value: formatObservationValue(label, valueText) });
     }
 
-    const id = first(item, ["id", "submission_id"]);
+    const id = first(item, ["submission_id", "id"]);
     return [{
       id,
+      ...(id ? { submissionId: id } : {}),
+      ...(first(item, ["opening_sub_id"])
+        ? { openingId: first(item, ["opening_sub_id"]) }
+        : {}),
       title: first(item, ["observation_title", "observation_type", "form_name", "title", "name"]),
       status: first(item, ["status", "submission_status", "status_name"]),
       severity: first(item, ["severity", "risk_level", "severity_name", "rpn"]),
+      ...((() => {
+        const created = first(item, ["created_at", "created_date"]);
+        return created && !Number.isNaN(new Date(created).getTime())
+          ? { createdAt: formatAuditDateTime(created) }
+          : {};
+      })()),
+      ...(first(item, ["submitter_name", "submitted_by", "auditor_name", "submitter"])
+        ? { submitter: first(item, ["submitter_name", "submitted_by", "auditor_name", "submitter"]) }
+        : {}),
       details,
-      images: [...new Set(images)],
+      images,
     }];
+  });
+
+  type Intermediate = SavedObservation & { openingId?: string };
+  const grouped = [...submissions.reduce((result, submission) => {
+    const key = submission.submissionId ?? `anonymous-${result.size}`;
+    const existing = result.get(key);
+    if (!existing) result.set(key, submission);
+    else {
+      existing.details = [...existing.details, ...submission.details].filter(
+        (detail, index, all) =>
+          all.findIndex((candidate) => candidate.label === detail.label && candidate.value === detail.value) === index,
+      );
+      existing.images.push(...submission.images);
+    }
+    return result;
+  }, new Map<string, Intermediate>()).values()];
+  const openings = grouped.filter((submission) => !submission.openingId);
+  const openingIds = new Set(openings.map((submission) => submission.submissionId));
+  const orphanClosings = grouped.filter(
+    (submission) =>
+      (submission as Intermediate).openingId &&
+      !openingIds.has((submission as Intermediate).openingId),
+  );
+  return [...openings, ...orphanClosings].map((submission) => {
+    const closing = grouped.find(
+      (candidate) =>
+        (candidate as Intermediate).openingId === submission.submissionId,
+    );
+    const { openingId: _openingId, ...opening } = submission;
+    if (!closing) return opening;
+    return {
+      ...opening,
+      status: "Closed",
+      closingSubmissionId: closing.submissionId,
+      closingDetails: closing.details,
+      closingImages: closing.images,
+    };
   });
 }
 export function buildSubmission(payload: SubmissionPayload): SubmissionPayload {
