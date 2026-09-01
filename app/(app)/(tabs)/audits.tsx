@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { Card, EmptyState, ErrorState, LoadingState, StatusBadge } from "@/src/components/ui";
 import { auditKeys, getAudits, type Audit } from "@/src/features/audits/api";
+import { formatAuditDateTime } from "@/src/features/audits/date";
 import {
   auditStatus,
   filterAudits,
@@ -41,7 +42,7 @@ function AuditCard({ audit }: { audit: Audit }) {
         {audit.auditor_name || audit.auditor ? (
           <Text className="mt-1 text-slate-600">Auditor: {audit.auditor_name ?? audit.auditor}</Text>
         ) : null}
-        {audit.created_at ? <Text className="mb-3 mt-1 text-slate-500">{audit.created_at}</Text> : <View className="h-3" />}
+        {audit.created_at ? <Text className="mb-3 mt-1 text-slate-500">{formatAuditDateTime(audit.created_at)}</Text> : <View className="h-3" />}
         <StatusBadge status={auditStatus(audit)} />
       </Card>
     </Pressable>

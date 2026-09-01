@@ -9,6 +9,7 @@ export type Audit = {
   auditor?: string;
   auditor_name?: string;
   created_at?: string;
+  observed_at?: string;
   status_id?: number;
   status?: string;
 };

@@ -1,3 +1,4 @@
+import { formatAuditDateTime } from "../audits/date";
 import { normalizeSavedObservations } from "./model";
 
 describe("saved observation normalization", () => {
@@ -17,6 +18,7 @@ describe("saved observation normalization", () => {
             target_date: "2026-09-10",
             sat_answers: [
               { question_text: "Location", answer_value: "Line 4" },
+              { question_text: "Reviewed date", answer_value: "2026-09-01T10:04:08.000Z" },
               { question_text: "Evidence", is_media: true, media: [marked] },
             ],
           },
@@ -32,8 +34,9 @@ describe("saved observation normalization", () => {
           { label: "Description", value: "Damaged guard" },
           { label: "Category", value: "Machinery" },
           { label: "Responsible person", value: "Alex" },
-          { label: "Target date", value: "2026-09-10" },
+          { label: "Target date", value: "10 Sep 2026, 12:00 AM" },
           { label: "Location", value: "Line 4" },
+          { label: "Reviewed date", value: formatAuditDateTime("2026-09-01T10:04:08.000Z") },
         ],
         images: [marked],
       },
