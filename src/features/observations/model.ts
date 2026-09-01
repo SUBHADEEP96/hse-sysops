@@ -49,6 +49,127 @@ export type SubmissionPayload = {
   sat_answers: SatAnswer[];
   opening_sub_id?: string | number;
 };
+
+export type ObservationDetail = {
+  label: string;
+  value: string;
+};
+
+export type SavedObservation = {
+  id?: string;
+  title?: string;
+  status?: string;
+  severity?: string;
+  details: ObservationDetail[];
+  images: string[];
+};
+
+type UnknownRecord = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is UnknownRecord =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const displayText = (value: unknown): string | undefined => {
+  if (typeof value === "string") return value.trim() || undefined;
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
+  if (Array.isArray(value)) {
+    const values = value.flatMap((item) => displayText(item) ?? []);
+    return values.length ? values.join(", ") : undefined;
+  }
+  if (isRecord(value))
+    return displayText(
+      value.name ?? value.label ?? value.title ?? value.value ?? value.answer_value,
+    );
+  return undefined;
+};
+
+const imageValues = (value: unknown): string[] => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed &&
+      (/^data:image\//i.test(trimmed) ||
+        /^https?:\/\//i.test(trimmed) ||
+        /^\//.test(trimmed))
+      ? [trimmed]
+      : [];
+  }
+  if (Array.isArray(value)) return value.flatMap(imageValues);
+  if (isRecord(value))
+    return imageValues(value.url ?? value.uri ?? value.path ?? value.media);
+  return [];
+};
+
+const first = (row: UnknownRecord, keys: string[]) => {
+  for (const key of keys) {
+    const value = displayText(row[key]);
+    if (value) return value;
+  }
+  return undefined;
+};
+
+const semanticFields: [string, string[]][] = [
+  ["Description", ["description", "observation_description"]],
+  ["Category", ["category", "category_name"]],
+  ["Remarks", ["remarks", "remark", "comments"]],
+  ["Recommended action", ["recommended_action", "corrective_action", "recommendation"]],
+  ["Responsible person", ["responsible_person", "assignee", "assigned_to", "responsible_person_name"]],
+  ["Created date", ["created_at", "created_date"]],
+  ["Target date", ["target_date", "due_date"]],
+  ["Location", ["location", "location_name"]],
+];
+
+/** Normalizes only values present in the submission-list response. */
+export function normalizeSavedObservations(value: unknown): SavedObservation[] {
+  const source = isRecord(value) && isRecord(value.data) ? value.data : value;
+  const items = Array.isArray(source)
+    ? source
+    : isRecord(source)
+      ? ["submissions", "observations", "rows", "data"].flatMap((key) =>
+          Array.isArray(source[key]) ? source[key] : [],
+        )
+      : [];
+
+  return items.flatMap((item) => {
+    if (!isRecord(item)) return [];
+    const details: ObservationDetail[] = [];
+    for (const [label, keys] of semanticFields) {
+      const value = first(item, keys);
+      if (value) details.push({ label, value });
+    }
+
+    const answers = Array.isArray(item.sat_answers)
+      ? item.sat_answers
+      : Array.isArray(item.answers)
+        ? item.answers
+        : [];
+    const images = [item.media, item.images, item.attachments].flatMap(imageValues);
+    for (const answer of answers) {
+      if (!isRecord(answer)) continue;
+      images.push(...imageValues(answer.media ?? answer.images ?? answer.attachments));
+      const rawValue = answer.answer_value ?? answer.answer ?? answer.value;
+      const valueText = displayText(rawValue);
+      const label = first(answer, [
+        "question_label",
+        "question_text",
+        "label",
+        "question",
+      ]);
+      if (label && valueText && imageValues(rawValue).length === 0)
+        details.push({ label, value: valueText });
+    }
+
+    const id = first(item, ["id", "submission_id"]);
+    return [{
+      id,
+      title: first(item, ["observation_title", "observation_type", "form_name", "title", "name"]),
+      status: first(item, ["status", "submission_status", "status_name"]),
+      severity: first(item, ["severity", "risk_level", "severity_name", "rpn"]),
+      details,
+      images: [...new Set(images)],
+    }];
+  });
+}
 export function buildSubmission(payload: SubmissionPayload): SubmissionPayload {
   return payload;
 }

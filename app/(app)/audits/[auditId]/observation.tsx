@@ -21,6 +21,7 @@ import { DynamicFormRenderer } from "@/src/features/observations/DynamicFormRend
 import type {
     AnswerValue,
     Attachment,
+    SatAnswer,
     SubmissionPayload,
 } from "@/src/features/observations/model";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -149,18 +150,21 @@ export default function Observation() {
       }
 
       // Build sat_answers
-      const satAnswers = questions.map((q) => {
+      const satAnswers: SatAnswer[] = questions.map((q) => {
         const questionId = q.id;
         const answer_value = values[String(questionId)] ?? null;
         
         // Filter out Attachment[] values - they're handled separately via media encoding
-        if (Array.isArray(answer_value) && answer_value.length > 0 && typeof answer_value[0] === "object" && "uri" in answer_value[0]) {
-          return null;
-        }
+        const savedAnswer = Array.isArray(answer_value)
+          ? answer_value.filter(
+              (value): value is string | number =>
+                typeof value === "string" || typeof value === "number",
+            )
+          : answer_value;
 
         const baseAnswer = {
           question_id: questionId,
-          answer_value,
+          answer_value: savedAnswer,
         };
 
         // Add media if this is the media question
@@ -169,7 +173,7 @@ export default function Observation() {
         }
 
         return baseAnswer;
-      }).filter((item): item is NonNullable<typeof item> => item !== null);
+      });
 
       mutation.mutate({
         audit_id: auditId,
