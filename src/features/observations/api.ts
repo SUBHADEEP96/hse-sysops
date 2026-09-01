@@ -13,10 +13,11 @@ function normalizeQuestion(value: unknown): Question | null {
   const id = value.id ?? value.question_id ?? value.questionId;
   if (typeof id !== "string" && typeof id !== "number") return null;
   const requiredValue = value.required ?? value.is_required ?? value.isRequired;
-  const options = Array.isArray(value.options)
-    ? value.options.flatMap((option) => {
+  const rawOptions = value.options ?? value.answer_options ?? value.answers;
+  const options = Array.isArray(rawOptions)
+    ? rawOptions.flatMap((option) => {
         if (!isRecord(option)) return [];
-        const optionId = option.id ?? option.option_id ?? option.optionId;
+        const optionId = option.id ?? option.option_id ?? option.optionId ?? option.value;
         if (typeof optionId !== "string" && typeof optionId !== "number")
           return [];
         return [
@@ -36,14 +37,17 @@ function normalizeQuestion(value: unknown): Question | null {
     ...value,
     id,
     label: text(value.label ?? value.question_text ?? value.questionText),
-    question_type: text(value.question_type ?? value.questionType),
+    question_type: isRecord(value.question_type)
+      ? { name: text(value.question_type.name ?? value.question_type.type) }
+      : text(value.question_type ?? value.questionType ?? value.type),
     required: typeof requiredValue === "boolean" ? requiredValue : undefined,
     options,
   };
 }
 
 export function normalizeDynamicForm(value: unknown): DynamicForm | null {
-  const root = isRecord(value) && isRecord(value.form) ? value.form : value;
+  const envelope = isRecord(value) && isRecord(value.data) ? value.data : value;
+  const root = isRecord(envelope) && isRecord(envelope.form) ? envelope.form : envelope;
   if (!isRecord(root)) return null;
   const id = root.id ?? root.form_id ?? root.formId;
   if (typeof id !== "string" && typeof id !== "number") return null;

@@ -206,12 +206,13 @@ export const updateAuditStatus = (id: string, status_id: 1 | 2 | 3) =>
     body: { audit_status_id: status_id },
   });
 export const normalizeForms = (value: unknown): FormOption[] => {
-  const rows = Array.isArray(value)
-    ? value
-    : isRecord(value) && Array.isArray(value.forms)
-      ? value.forms
-      : isRecord(value) && Array.isArray(value.rows)
-        ? value.rows
+  const source = isRecord(value) && isRecord(value.data) ? value.data : value;
+  const rows = Array.isArray(source)
+    ? source
+    : isRecord(source) && Array.isArray(source.forms)
+      ? source.forms
+      : isRecord(source) && Array.isArray(source.rows)
+        ? source.rows
         : [];
   const unique = new Map<string, FormOption>();
   for (const row of rows) {

@@ -3,7 +3,7 @@ import React, { useEffect, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { calculateRpn, toggleMultiSelect, type AnswerValue, type DynamicForm, type Question } from "./model";
 
-function kind(q: Question) {
+export function questionKind(q: Question) {
   const raw =
     (typeof q.question_type === "object"
       ? q.question_type.name
@@ -14,13 +14,13 @@ function kind(q: Question) {
 }
 function role(q: Question): "likelihood" | "severity" | "rpn" | undefined {
   if (q.metadata?.role) return q.metadata.role;
-  const type = kind(q);
+  const type = questionKind(q);
   if (type.includes("likelihood")) return "likelihood";
   if (type.includes("severity")) return "severity";
   if (type === "rpn" || type.includes("risk priority")) return "rpn";
 }
 export function isMultiSelectQuestion(q: Question) {
-  const type = kind(q);
+  const type = questionKind(q);
   return type.includes("multi") || type.includes("checkbox");
 }
 export function DynamicFormRenderer({
@@ -54,14 +54,22 @@ export function DynamicFormRenderer({
     <View>
       {questions.map((q) => {
         const id = String(q.id),
-          type = kind(q),
+          type = questionKind(q),
           label = q.label ?? q.question ?? "Question";
+        if (type.includes("media") || type.includes("image") || type.includes("attachment") || type.includes("file"))
+          return null;
         const multi = isMultiSelectQuestion(q);
+        const yesNo = type.includes("yes/no") || type.includes("yes no") || type === "boolean";
+        const options = yesNo && !(q.options?.length)
+          ? [{ id: "yes", label: "Yes", value: true }, { id: "no", label: "No", value: false }]
+          : q.options ?? [];
         if (
           type.includes("choice") ||
           type.includes("select") ||
           type.includes("likelihood") ||
-          type.includes("severity")
+          type.includes("severity") ||
+          type.includes("dropdown") ||
+          yesNo
         )
           return (
             <View key={id} className="mb-4">
@@ -70,11 +78,11 @@ export function DynamicFormRenderer({
                 {q.required || q.is_required ? " *" : ""}
               </Text>
               <View className="flex-row flex-wrap gap-2">
-                {(q.options ?? []).map((o, optionIndex) => {
-                  const option = o.value ?? o.id;
+                {options.map((o, optionIndex) => {
+                  const option: string | number | boolean = o.value ?? o.id;
                   const current = values[id];
                   const selected = Array.isArray(current)
-                    ? (current as (string | number)[]).includes(option)
+                    ? current.some((item) => item === option)
                     : current === option;
                   return (
                     <Pressable
@@ -87,15 +95,15 @@ export function DynamicFormRenderer({
                           multi
                             ? toggleMultiSelect(
                                 current,
-                                option,
-                                (q.options ?? []).map((item) => item.value ?? item.id),
+                                option as string | number,
+                                options.map((item) => (item.value ?? item.id) as string | number),
                               )
                             : option,
                         )
                       }
                       className={`min-h-11 justify-center rounded-xl border px-4 ${selected ? "border-brand bg-red-50" : "border-slate-300 bg-white"}`}
                     >
-                      <Text>{multi ? `${selected ? "☑" : "☐"} ` : ""}{o.label ?? o.option ?? String(option)}</Text>
+                      <Text>{multi ? `${selected ? "☑" : "☐"} ` : ""}{o.label ?? String(option)}</Text>
                     </Pressable>
                   );
                 })}
@@ -120,6 +128,7 @@ export function DynamicFormRenderer({
               onChange(id, numeric && v !== "" ? Number(v) : v)
             }
             keyboardType={numeric ? "numeric" : "default"}
+            placeholder={type.includes("date") ? "YYYY-MM-DD" : undefined}
             multiline={type.includes("multiline") || type.includes("textarea")}
             error={errors[id]}
           />

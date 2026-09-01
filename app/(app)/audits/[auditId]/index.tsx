@@ -12,12 +12,14 @@ import {
     getAudit,
     getAuditForms,
     getAuditSubmissions,
+    normalizeForms,
     updateAuditStatus,
 } from "@/src/features/audits/api";
 import { formatAuditDateTime } from "@/src/features/audits/date";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { ObservationList } from "@/src/features/observations/ObservationList";
-import { normalizeSavedObservations } from "@/src/features/observations/model";
+import { normalizeSavedObservations, type Question } from "@/src/features/observations/model";
+import { getDynamicForm } from "@/src/features/observations/api";
 import { router, useLocalSearchParams } from "expo-router";
 import { Alert, Text, View } from "react-native";
 
@@ -46,6 +48,22 @@ export default function AuditDetail() {
     queryKey: ["audits", auditId, "submissions"],
     queryFn: () => getAuditSubmissions(auditId),
   });
+  const formOptions = normalizeForms(forms.data);
+  const definitions = useQueries({
+    queries: formOptions.map((option) => ({
+      queryKey: ["dynamic-form", option.id],
+      queryFn: () => getDynamicForm(option.id),
+    })),
+  });
+  const questionsById = (() => {
+    const lookup = new Map<string, Question>();
+    for (const definition of definitions) {
+      const dynamicForm = definition.data;
+      const questions = dynamicForm?.sections?.flatMap((section) => section.questions ?? []) ?? dynamicForm?.questions ?? [];
+      for (const question of questions) lookup.set(String(question.id), question);
+    }
+    return lookup;
+  })();
   const status = useMutation({
     mutationFn: (s: 1 | 2 | 3) => updateAuditStatus(auditId, s),
     onSuccess: async () => {
@@ -113,10 +131,14 @@ export default function AuditDetail() {
       ) : null}
       <Text className="mb-2 mt-3 text-lg font-bold text-ink">Observations</Text>
       <ObservationList
-        observations={normalizeSavedObservations(submissions.data)}
+        observations={normalizeSavedObservations(submissions.data, questionsById)}
         loading={submissions.isLoading}
         error={submissions.error?.message}
         retry={() => void submissions.refetch()}
+        onClose={(submissionId) => router.push({
+          pathname: "/(app)/audits/[auditId]/observation",
+          params: { auditId, mode: "closing", openingSubId: submissionId },
+        })}
       />
       <Text className="mb-2 mt-3 text-lg font-bold text-ink">Status</Text>
       <View className="mb-5 gap-2">

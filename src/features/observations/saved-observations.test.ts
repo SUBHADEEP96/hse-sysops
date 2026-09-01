@@ -27,6 +27,7 @@ describe("saved observation normalization", () => {
     ).toEqual([
       {
         id: "42",
+        submissionId: "42",
         title: "Unsafe condition",
         status: "Open",
         severity: "High",
@@ -64,5 +65,32 @@ describe("saved observation normalization", () => {
       images: ["/uploads/marked.jpg"],
     });
     expect(JSON.stringify(observations)).not.toMatch(/undefined|null/);
+  });
+
+  test("groups answer rows by submission and joins a closing submission to its opening", () => {
+    const questions = new Map([
+      ["101", { id: 101, label: "What was observed?" }],
+      ["201", { id: 201, label: "Corrective action" }],
+    ]);
+    const observations = normalizeSavedObservations(
+      [
+        { submission_id: 11, sat_answers: [{ question_id: 101, answer_value: "Guard removed" }] },
+        { submission_id: 11, sat_answers: [{ question_id: 105, is_media: true, media: ["data:image/jpeg;base64,first", "data:image/jpeg;base64,second"] }] },
+        { submission_id: 12, opening_sub_id: 11, sat_answers: [{ question_id: 201, answer_value: "Guard refitted" }] },
+        { submission_id: 13, sat_answers: [{ question_id: 101, answer_value: "Oil spill" }] },
+      ],
+      questions,
+    );
+
+    expect(observations).toHaveLength(2);
+    expect(observations[0]).toMatchObject({
+      submissionId: "11",
+      closingSubmissionId: "12",
+      status: "Closed",
+      details: [{ label: "What was observed?", value: "Guard removed" }],
+      closingDetails: [{ label: "Corrective action", value: "Guard refitted" }],
+      images: ["data:image/jpeg;base64,first", "data:image/jpeg;base64,second"],
+    });
+    expect(observations[1].submissionId).toBe("13");
   });
 });
