@@ -15,6 +15,8 @@ import {
     updateAuditStatus,
 } from "@/src/features/audits/api";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { ObservationList } from "@/src/features/observations/ObservationList";
+import { normalizeSavedObservations } from "@/src/features/observations/model";
 import { router, useLocalSearchParams } from "expo-router";
 import { Alert, Text, View } from "react-native";
 
@@ -29,11 +31,6 @@ const rows = (value: unknown, keys: string[]) => {
   }
   return [];
 };
-const textValue = (value: unknown, fallback: string) =>
-  typeof value === "string" || typeof value === "number"
-    ? String(value)
-    : fallback;
-
 export default function AuditDetail() {
   const { auditId } = useLocalSearchParams<{ auditId: string }>();
   const q = useQuery({
@@ -95,41 +92,21 @@ export default function AuditDetail() {
       {forms.error ? (
         <Text className="mb-2 text-red-700">Unable to load audit forms.</Text>
       ) : null}
-      {submissions.error ? (
-        <Text className="mb-2 text-red-700">
-          Unable to load submitted observations.
-        </Text>
-      ) : null}
-      {forms.isLoading || submissions.isLoading ? <LoadingState /> : null}
-      {!forms.isLoading && !submissions.isLoading ? (
+      {forms.isLoading ? <LoadingState /> : null}
+      {!forms.isLoading ? (
         <Card>
           <Text className="mb-1 font-semibold text-ink">
             Forms: {rows(forms.data, ["forms", "rows"]).length}
           </Text>
-          <Text className="mb-3 text-slate-600">
-            Observations: {rows(submissions.data, ["submissions", "rows"]).length}
-          </Text>
-          {rows(submissions.data, ["submissions", "rows"]).map((submission, index) => (
-            <View
-              key={`${String(submission.id ?? "submission")}-${index}`}
-              className="mb-2 border-b border-slate-200 pb-2"
-            >
-              <Text className="font-semibold text-ink">
-                {textValue(
-                  submission.form_name ?? submission.name ?? submission.title,
-                  `Observation ${index + 1}`,
-                )}
-              </Text>
-              <Text className="text-slate-600">
-                {textValue(
-                  submission.status ?? submission.submission_status,
-                  "Submitted",
-                )}
-              </Text>
-            </View>
-          ))}
         </Card>
       ) : null}
+      <Text className="mb-2 mt-3 text-lg font-bold text-ink">Observations</Text>
+      <ObservationList
+        observations={normalizeSavedObservations(submissions.data)}
+        loading={submissions.isLoading}
+        error={submissions.error?.message}
+        retry={() => void submissions.refetch()}
+      />
       <Text className="mb-2 mt-3 text-lg font-bold text-ink">Status</Text>
       <View className="mb-5 gap-2">
         <Button

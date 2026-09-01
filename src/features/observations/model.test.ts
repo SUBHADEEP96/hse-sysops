@@ -17,7 +17,7 @@ describe("observation contract helpers", () => {
       audit_id: 4,
       submitter_id: 7,
       form_id: 2,
-      sat_answers: [{ question_id: 1, answer: "safe" }],
+      sat_answers: [{ question_id: 1, answer_value: "safe" }],
     };
     expect(buildSubmission(base)).toEqual(base);
     expect(buildSubmission({ ...base, opening_sub_id: 10 })).toMatchObject({
@@ -25,7 +25,7 @@ describe("observation contract helpers", () => {
     });
     expect(buildSubmission(base)).not.toHaveProperty("submission_type_id");
   });
-  test("validates attachment type and size and isolates missing transport", () => {
+  test("validates attachment type and size and exposes the media encoder", () => {
     expect(
       validateAttachment({
         uri: "file://a",
@@ -41,7 +41,7 @@ describe("observation contract helpers", () => {
         size: 11 * 1024 * 1024,
       }),
     ).toMatch(/10 MB/);
-    expect(ObservationAttachmentAdapter.canSubmit).toBe(false);
+    expect(ObservationAttachmentAdapter.canSubmit).toBe(true);
   });
   test("toggles multi-select without duplicates in option order", () => {
     expect(toggleMultiSelect(["head"], "eye", ["body", "head", "eye"])).toEqual(["head", "eye"]);
