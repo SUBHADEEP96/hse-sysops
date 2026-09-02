@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "HSE Safety Audit Tool",
-    "slug": "hse-sat-ios",
+    "slug": "hse-sysops",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
